@@ -133,7 +133,9 @@ function renderExamples() {
       //
       // 正确做法：容器 #example-grid 保留 role="list"，卡片本身保持 button 语义。
       // 列表语义由容器提供，不靠子元素伪造。
-      'aria-label': `载入示例：${ex.title}（按钮）`,
+      // 不要加「（按钮）」后缀 —— role=button 已经会让读屏念「按钮」，
+      // 再写一遍会变成「…（按钮），按钮」（a11y 审计发现的新冗余）。
+      'aria-label': `载入示例：${ex.title}`,
       dataset: { example: ex.key },
       onclick: () => loadExample(ex.key),
     },
@@ -169,9 +171,15 @@ function renderFactorList() {
   state.factors.forEach((factor, index) => {
     const labelInput = el('input', {
       type: 'text',
+      // id 是给因素卡容器的 aria-labelledby 用的：
+      // 容器需要"指向一个真实存在的、有文字的元素"才能获得可访问名。
+      // 没有 id 的 aria-labelledby 等于没写（浏览器会忽略，名字仍是空）。
+      id: `label-${factor.id}`,
       maxlength: '60',
       autocomplete: 'off',
       value: factor.label,
+      // 有可见/半可见的 label 关系后，aria-label 会**覆盖**它，
+      // 所以这里保留"第 N 个因素的名称"作为兜底（容器分组靠 aria-labelledby）。
       'aria-label': `第 ${index + 1} 个因素的名称`,
       dataset: { factorId: factor.id, field: 'label' },
       oninput: (e) => { factor.label = e.target.value; scheduleRecalc(); },
@@ -209,9 +217,22 @@ function renderFactorList() {
       value: String(factor.weight),
     }, String(factor.weight));
 
-    const item = el('li', { class: 'factor-item', dataset: { factorId: factor.id } },
+    // 因素卡必须有**分组边界 + 可区分的名字**（AX 树审计最严重的问题）。
+    //
+    // 实测：4 张因素卡 × (4 个加减按钮 + 2 个评分框 + 1 个权重滑杆) = 28 个控件，
+    // 在 AX 树上只归并出 **7 个逐字相同的名字**，父链 `none ← listitem ← list`
+    // （listitem 自己的 name 是空串，那个 .sr-only 的「因素 1」根本没挂到容器上）。
+    // 读屏用户连按 4 次 Tab，听到的是同一句话，**不知道自己正在改哪一项**。
+    //
+    // 修法：li 加 role="group" + aria-labelledby 指向因素名输入框。
+    // 一行的结构改动同时消解「名字不可区分」和「没有分组边界」两件事。
+    const item = el('li', {
+      class: 'factor-item',
+      dataset: { factorId: factor.id },
+      role: 'group',
+      'aria-labelledby': `label-${factor.id}`,
+    },
       el('div', { class: 'factor-top' },
-        el('span', { class: 'sr-only', text: `因素 ${index + 1}` }),
         labelInput,
         removeBtn),
       el('div', { class: 'rating-block' }, ratingA, ratingB),
