@@ -2650,3 +2650,39 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
 main:focus:not(:focus-visible) {
   outline: none;
 }
+
+/* --------------------------------------------------------------------------
+   打印分页：把 break-inside 下沉到细粒度（QA 的 P2，4 个 FAIL 的根因）
+   --------------------------------------------------------------------------
+   问题：上面 `.card { break-inside: avoid }` 要求整张卡不被切断，
+   但实测因素卡高度 306mm，而 A4 可打印高度只有 269mm —— **它根本装不下一页**。
+   浏览器遇到"装不下又要求不断"时只能违反规则，结果是
+   21 个元素跨分页边界，`.rating-row`（一行评分）被从中间切成两半。
+
+   CSS 的 `break-inside: avoid` 不是强制约束，而是"尽量"。
+   当元素本身超过一页时，任何浏览器都只能切 —— 所以规则写在大卡上是无效的。
+
+   修法：大卡允许断开，把 avoid 下沉到真正不能断的最小单元：
+     · .factor-item   一个因素整块
+     · .rating-row    一行评分（A 或 B）
+     · .rating-block  一组评分
+     · .contrib-table tr  贡献表的一行
+   这样页面会在"因素之间"断开，而不是从一行评分中间劈开。
+   -------------------------------------------------------------------------- */
+@media print {
+  .card, .notice, .privacy-block, .hypothesis-q {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+  .factor-item,
+  .rating-row,
+  .rating-block,
+  .contrib-table tr,
+  .flip-item,
+  .hero-demo {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  /* 因素卡之间留出断页余量，避免刚好卡在边界 */
+  .factor-item { margin-bottom: 6pt; }
+}
