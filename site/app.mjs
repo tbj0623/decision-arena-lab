@@ -181,7 +181,7 @@ function renderFactorList() {
 
     const weightRange = el('input', {
       type: 'range',
-      min: '0', max: '10', step: '1',
+      min: '0', max: '10', step: '0.5',
       value: String(factor.weight),
       id: `w-${factor.id}`,
       'aria-describedby': `w-out-${factor.id}`,
@@ -351,7 +351,16 @@ function bumpRating(input, factor, side, delta) {
 
 function clampWeight(n) {
   if (!Number.isFinite(n)) return 0;
-  return Math.min(10, Math.max(0, Math.round(n)));
+  // 支持 0.5 步进（不是只有整数）。
+  //
+  // 历史缺陷（首次触达体验走查 B-2，阻断级）：
+  // 权重滑杆原来 step=1、且这里 Math.round() 强制取整。
+  // 但翻转发生在细粒度的权重占比上 —— 实测 offer 的临界点是 39.39%，
+  // 而整数权重只能落到 33.33% / 37.50% / 41.18%，
+  // **用户永远够不到"打平"那一刻**，翻转卡片说的数字在界面上做不到。
+  //
+  // 改成 0.5 步进后，占比粒度足够逼近临界点（配合「跳到精确临界点」按钮）。
+  return Math.min(10, Math.max(0, Math.round(n * 2) / 2));
 }
 
 function addFactor() {
@@ -780,7 +789,17 @@ function renderFlip(analysis, thresholds, flip) {
     try {
       const dx = diagnoseNoFlip(state);
       if (dx && dx.reason === 'ALL_SAME_SIGN') {
-        whyText = '你在每个因素上都给了同一个方案更高（或更低）的分——评分方向完全一致。这种一致性是很强的信号：结论稳，调权重改不了。要动它，只能回去质疑评分本身。';
+        // 「方向一致 → 结论稳」这句话会**主动帮倒忙**（方法论审计发现）。
+        //
+        // 数学上没错：同号则 Δ 恒同号，调权重确实改不了。
+        // 但"每一项都一样偏向同一边"恰恰是**某一列评分填反**的典型指纹。
+        // 实测（54449 个真实两难决策）：一格填反后有 6.3% 会变成
+        // "同向 + 翻不了"，工具说"结论稳，不用看了" —— 而数据是错的。
+        // 这是全站唯一一处"防线起反作用"的地方。
+        //
+        // 所以措辞必须从"结论稳"改成"先去核对有没有填反"。
+        // 仍然如实说"调权重改不了"（这是数学事实），但不再给出虚假的确定感。
+        whyText = '你在每个因素上都给了同一个方案更高（或更低）的分——评分方向完全一致，所以调权重确实改不了结论。不过这种"全票通过"恰恰要先警惕一件事：有没有哪一项的评分方向填反了？建议逐项核对一遍再下判断。';
       } else if (dx && dx.reason === 'ZERO_GAP') {
         whyText = '有几个因素上，你给两个方案打的分完全一样——它们对结果没有区分作用。在这种前提下调权重是白费力气，因为那些因素本来就"不表态"。想改变结论，先回去给这些因素打出真实的差别。';
       } else if (dx && dx.reason === 'OUT_OF_RANGE') {
@@ -907,6 +926,19 @@ function buildFlipSlider(flip) {
     out.value = pct(t, 2);
     // 关键：滑杆位置必须跟着走，否则界面会同时存在两个矛盾的位置指示（red-team P0-5）
     if (moveSlider) slider.value = String(t * 100);
+
+    // 无障碍：可访问值和可访问名也要跟着更新。
+    //
+    // 历史缺陷（端到端走查发现）：原来 describe() 只更新了 out.value 和 slider.value，
+    // **没更新 aria-valuetext / aria-label**。
+    // 实测拖到 76.71% 后：output 显示 76.71%、滑杆 value=76.71，
+    // 但 aria-valuetext 仍是初始的「28.57%」，aria-label 里也写着"当前 28.57%"。
+    // 读屏用户听到的永远是那一开始的值 —— 而视觉用户看到的完全正确。
+    // 这类缺陷只有真正用读屏/查 AX tree 才会发现；首屏那根滑杆是对的，只有工作区这根漏了。
+    const pctText = pct(t, 2);
+    slider.setAttribute('aria-valuetext', pctText);
+    // aria-label 里嵌了当前值，也必须同步，否则读屏会念出两个不同的数
+    slider.setAttribute('aria-label', `「${flip.label}」的权重占比（0–100%，当前 ${pctText}）`);
     const absDiff = Math.abs(projected.difference);
     let verdictText;
     // 「打平」的判据必须和**显示的差值**一致，不能各说各话。
@@ -995,9 +1027,34 @@ function buildFlipSlider(flip) {
     type: 'button',
     class: 'btn btn-mini flip-jump',
     onclick: () => {
-      const projected = describe(flip.thresholdShare, { moveSlider: true });
+      // 关键：这个按钮必须**同时写回工作区的真实权重**，否则会出现
+      // 「同一屏两个互斥结论」—— 演示区说"打平 66.1/66.1"，
+      // 上方结果卡还是 70.7/63.6，左边权重滑杆纹丝不动。
+      //
+      // 历史缺陷（首次触达体验走查 B-1，阻断级）：
+      // 原实现只调 describe()（那是演示区的只读投影），没有 touch state。
+      // 用户以为"我把它调到临界点了"，但真正参与计算的数据没变。
+      //
+      // 正确做法：反解出"要让占比等于 t* 需要什么权重"，写进 state.factors，
+      // 然后重渲染 + recalc，让整个页面（结果卡、贡献表、权重滑杆、翻转卡）
+      // 全部同步到同一个世界。
+      const targetShare = flip.thresholdShare;
+      const idx = state.factors.findIndex((f) => f.id === flip.factorId);
+      if (idx >= 0) {
+        // 其余因素权重之和（保持它们之间的比例不变，与 t* 的定义一致）
+        const othersWeight = state.factors
+          .reduce((acc, f, i) => (i === idx ? acc : acc + f.weight), 0);
+        // t = w / (w + others)  ⇒  w = t * others / (1 - t)
+        if (targetShare < 1 && othersWeight > 0) {
+          const newWeight = (targetShare * othersWeight) / (1 - targetShare);
+          state.factors[idx].weight = Math.min(MAX_WEIGHT_UI, Math.max(0, Number(newWeight.toFixed(4))));
+          renderFactorList();   // 让权重滑杆/数字跟着走
+          recalc();             // 让结果卡、贡献表、翻转卡全部重算
+        }
+      }
+      const projected = describe(targetShare, { moveSlider: true });
       jumpHint.textContent = Math.abs(projected.difference) < 1e-6
-        ? `已把滑杆拨到精确临界点 ${pct(flip.thresholdShare, 4)}：两边分数相同。`
+        ? `已把「${flip.label}」的权重设为精确临界值 ${pct(targetShare, 4)}，上方结果与左侧权重已同步：两边分数相同。`
         : `注意：此处残差 ${projected.difference.toExponential(2)}，未达到打平阈值。`;
     },
   }, '跳到精确临界点');
@@ -1162,7 +1219,30 @@ function buildShareText() {
     const shareExact = pct(lastFlip.thresholdShare, 4);
     lines.push(`最关键的一条：把「${lastFlip.label}」的权重占比调到约 ${sharePct}（精确 ${shareExact}），两边就会打平，再越过就翻过来。`);
   } else {
-    lines.push('关键发现：各因素的评分方向一致，单靠调权重翻不过来——真正该做的是去核实那几条评分。');
+    // lastFlip 为 null 有**三种**不同情况，不能一律说"方向一致"。
+    //
+    // 历史缺陷（方法论审计发现）：原来这里无条件写"各因素的评分方向一致"。
+    // 但 lastFlip 在打平态也是 null —— 而打平恰恰是**最容易翻**的状态，
+    // 说成"翻不过来"与同一屏的 UI 直接打架。
+    // ZERO_GAP（有因素两边同分）同样不是"方向一致"（sameSign=false）。
+    //
+    // 现在按真实原因分支，与页面内的 diagnoseNoFlip 口径一致。
+    let reasonText;
+    try {
+      const dx = diagnoseNoFlip(state);
+      if (analysis.tie) {
+        reasonText = '关键发现：两个方案现在分数完全相同——这是最容易翻过去的状态，往任一方向调都会立刻分出胜负。此刻真正该问的是"我对哪一项最没把握"。';
+      } else if (dx && dx.reason === 'ZERO_GAP') {
+        reasonText = '关键发现：有几个因素上两个方案同分，它们对结果没有区分作用。调权重是白费力气，该做的是先给这些因素打出真实的差别。';
+      } else if (dx && dx.reason === 'ALL_SAME_SIGN') {
+        reasonText = '关键发现：各因素的评分方向完全一致，单靠调权重翻不过来。不过这种"全票通过"要先警惕评分有没有填反——建议逐项核对后再下判断。';
+      } else {
+        reasonText = '关键发现：单靠调整某一个因素的权重，结论翻不过来。';
+      }
+    } catch {
+      reasonText = '关键发现：单靠调整某一个因素的权重，结论翻不过来。';
+    }
+    lines.push(reasonText);
   }
   lines.push('');
   if (lastHypothesis) {
@@ -1227,6 +1307,9 @@ function resetAll() {
  *  - 不新建第二套算法，也不缓存一份"演示用的结果"
  */
 const HERO_DEMO_KEY = 'offer';
+
+// 权重滑杆的最大值（与 HTML 的 max 一致）。反解临界权重时用它做上界。
+const MAX_WEIGHT_UI = 10;
 
 function initHeroDemo() {
   const box = $('#hero-demo');
