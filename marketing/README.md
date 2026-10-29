@@ -4,7 +4,7 @@
 
 > **本目录全部内容为待发草稿。没有发布到任何平台。**
 > 所有文件开头都带 `<!-- STATUS: DRAFT — NOT POSTED -->`。
-> 站点尚未部署，因此所有 `{{SITE_URL}}` 均为占位符，**替换前不得发布**。
+> 站点**已部署并验证 HTTP 200**：<https://tbj0623.github.io/decision-arena-lab/>。三份对外文案里的地址已填入真实 URL；唯一还没就绪的是二维码（待生成）。
 
 ---
 
@@ -12,11 +12,11 @@
 
 | # | 文件 | 语言 | 用途 | 字数/时长 | 状态 |
 |---|---|---|---|---|---|
-| 1 | [launch_zh.md](launch_zh.md) | 中文 | 主推文（朋友口吻，非营销腔） | 322 汉字 | 草稿 · 待补 `{{SITE_URL}}` |
-| 2 | [launch_en.md](launch_en.md) | 英文 | 面向英语开发者/技术社区，非逐字翻译 | 250 words | 草稿 · 待补 `{{SITE_URL}}` |
+| 1 | [launch_zh.md](launch_zh.md) | 中文 | 主推文（朋友口吻，非营销腔） | 322 汉字 | 草稿 · URL 已填 |
+| 2 | [launch_en.md](launch_en.md) | 英文 | 面向英语开发者/技术社区，非逐字翻译 | 250 words | 草稿 · URL 已填 |
 | 3 | [developer_zh.md](developer_zh.md) | 中文 | 开源项目介绍（架构/测试/贡献/`core.mjs` 四导出） | 600 汉字 | 草稿 |
-| 4 | [short_video_30s.md](short_video_30s.md) | 中文 | 30 秒短视频分镜（5 镜，严格时间轴） | 30s | 草稿 · 未拍摄 · 待补 `{{SITE_URL}}` / `{{QR_CODE}}` |
-| 5 | [short_video_90s.md](short_video_90s.md) | 中文 | 90 秒完整版分镜（8 镜，含规则与局限） | 90s | 草稿 · 未拍摄 · 待补 `{{SITE_URL}}` / `{{QR_CODE}}` |
+| 4 | [short_video_30s.md](short_video_30s.md) | 中文 | 30 秒短视频分镜（5 镜，严格时间轴） | 30s | 草稿 · 未拍摄 · URL 已填 · `{{QR_CODE}}` 待生成 |
+| 5 | [short_video_90s.md](short_video_90s.md) | 中文 | 90 秒完整版分镜（8 镜，含规则与局限） | 90s | 草稿 · 未拍摄 · URL 已填 · `{{QR_CODE}}` 待生成 |
 | 6 | [screenshot_plan.md](screenshot_plan.md) | 中文 | 截图需求清单（5 张，已有 1 张缺 4 张） | — | 草稿 · S1–S4 未拍摄 |
 | 7 | [feedback_plan.md](feedback_plan.md) | 中文 | GitHub Issues 反馈模板 + 7 天验证计划 | — | 草稿 · 计划未启动 |
 | — | [check-redlines.mjs](check-redlines.mjs) | — | 红线自检脚本（工具，非素材，不发布） | — | 可运行 |
@@ -28,25 +28,29 @@
 | 事项 | 真实状态 |
 |---|---|
 | 社交平台发布 | **未发布**（本角色只产出草稿，不代发） |
-| 站点部署 | **未部署**（`SITE_DEPLOYED = NO`） |
-| `{{SITE_URL}}` | **未替换** —— 待站点上线并真实访问验证后统一替换 |
-| `{{QR_CODE}}` | **未生成** —— 二维码必须在 URL 确定后生成，禁止用假码占位 |
+| 站点部署 | **已部署** —— <https://tbj0623.github.io/decision-arena-lab/> ，2026-10-29 实测 HTTP 200 |
+| 站点 URL | **已确定并填入文案** —— 原先 6 处占位符已全部替换为真实地址，正文层残留 0（本文档只在"已替换"这句说明里提到占位符名） |
+| `{{QR_CODE}}` | **待生成** —— URL 已确定，可以直接生成二维码了；生成前禁止用假码占位 |
 | 截图 | **1/5 已有但已过时**：`docs/screenshots/mobile-360.png`（旧版 `job` 示例，看不到分数）；缺 4 张关键图，S0 建议重拍 |
 | 视频 | **0/2 未拍摄** |
-| 反馈入口 | **未创建**（模板已备好，待仓库公开后落地） |
-| 真实访客 / 用户 / star / Issue | **全部为 0** |
+| 反馈入口 | **未创建** —— 仓库已公开且 Issues 已开启，但 `.github/ISSUE_TEMPLATE/` 尚未落地 |
+| 真实访客 / 用户 / star / Issue | **全部为 0**（GitHub API 实测：stars 0 / forks 0 / open issues 0） |
 
 ---
 
-## 待办（部署后按顺序执行）
+## 已完成 ✅
 
-1. 站点部署 → 真实浏览器打开验证（含 Network 面板无外部请求）
-2. 全库替换 `{{SITE_URL}}` → 替换后**逐文件复查一遍**，用 `grep -rn "{{" marketing/` 确认无残留
-3. 按 `screenshot_plan.md` 拍 S1–S4（真实数据，不 P 图）
-4. 按 `short_video_30s.md` / `short_video_90s.md` 真实录屏
-5. URL 确定后再生成二维码，替换 `{{QR_CODE}}`
-6. 落地 `.github/ISSUE_TEMPLATE/feedback.yml` 与标签（内容见 `feedback_plan.md`）
-7. 最后再跑一遍下方红线自检脚本，全绿才允许发布
+- [x] 站点部署 → <https://tbj0623.github.io/decision-arena-lab/>（实测 HTTP 200，静态资源 `core.mjs` / `features/narrative.mjs` 均 200）
+- [x] 线上版本与仓库一致（线上 `narrative.mjs` 的 5 个 `key` 与仓库逐一对应）
+- [x] 全库替换站点地址占位符 → 三份对外文案均已填入真实 URL；`grep -rn "tbj0623.github.io" marketing/` 可逐处核对
+
+## 待办（按顺序执行）
+
+1. 按 `screenshot_plan.md` 拍 S1–S4（真实数据，不 P 图）
+2. 按 `short_video_30s.md` / `short_video_90s.md` 真实录屏
+3. 生成二维码（URL 已确定），替换 4 处 `{{QR_CODE}}`，并真机扫码验证
+4. 落地 `.github/ISSUE_TEMPLATE/feedback.yml` 与标签（内容见 `feedback_plan.md`）
+5. 最后再跑一遍下方红线自检脚本，FAIL 为 0 才允许发布
 
 ---
 
@@ -91,7 +95,7 @@ node marketing/check-redlines.mjs
 
 它会做三件事：① 检查每个 `.md` 首行是否为 `<!-- STATUS: DRAFT — NOT POSTED -->`；② 扫红线词，**按「否定语境」分级**——否定语境的命中标 WARN（需人工确认），肯定语境直接 FAIL；③ 检查三份直接对外文案是否都含三条必填声明。
 
-### 实测结果（2026-10-29 19:55 左右，本机最后一次运行）
+### 实测结果（2026-10-29 21:25，部署后修复完成时重跑）
 
 ```
 文件数 8 ｜ FAIL 0 ｜ WARN 65
@@ -123,14 +127,14 @@ node marketing/check-redlines.mjs
 
 ### 人工复核清单（脚本查不出的部分）
 
-- [x] 所有数值都来自 `site/core.mjs` 实算（`node --test` 实测 86 pass / 0 fail / 5 todo；`node work/product/verify-journeys.mjs` 5 条 PASS）
+- [x] 所有数值都来自 `site/core.mjs` 实算（`node --test` 实测 **107 pass / 0 fail / 0 todo**；`node work/product/verify-journeys.mjs` 5 条 PASS）
 - [x] 无真实品牌名、公司名、真人名（示例场景来自 `site/features/narrative.mjs`，文件头注明"虚构"）
 - [x] 无编造的访问量、用户数、star 数、好评、评测引用（`feedback_plan.md` 明确写当前全部为 0）
 - [x] 无任何暗示专业建议的表述
 - [x] 每个 `.md` 首行均为 `<!-- STATUS: DRAFT — NOT POSTED -->`
-- [x] 所有 `{{SITE_URL}}` / `{{QR_CODE}}` 都处在"待替换"说明的上下文中，没有被当成已可用链接
+- [x] 三份对外文案里的地址均为真实 URL（站点地址占位符已全部替换）；剩余 4 处二维码占位均在"待生成"上下文中
 
-> ⚠️ 测试条数会随队友提交变化。素材里**不要写死"共 XX 条测试"**——`developer_zh.md` 初稿写过"62 条"，实测已涨到 91（86 pass + 5 todo），已删除具体数字。要提就写"跑 `node --test` 全部通过"，让人自己去跑。
+> ⚠️ **测试条数在本次夜里变了三次**（62 → 86 → 91 → 94 → 107）。这就是为什么素材里不该写死条数：`developer_zh.md` 里的具体数字已全部删掉，改成"跑 `node --test` 全部通过"。本 README 保留 107 是因为它需要记录本机实测快照，**对外文案不要照抄**。
 
 ---
 
@@ -152,15 +156,19 @@ node work/product/verify-journeys.mjs    # PASS：5 条旅程与 core.mjs 一致
 | 6 | 37.5% | 66.9 | 65.6 | +1.3 | A（几乎打平） |
 | 7 | 41.2% | 65.3 | 66.5 | −1.2 | **B（翻转）** |
 
-翻转阈值（权重 7 状态下）：收入确定性占比 41.2% → 39.4% 时打平，再往下翻转。
+翻转阈值（权重 7 状态下）：收入确定性占比 41.2% → **39.39%**（界面精确值 39.3939%）时打平，再往下翻转。
+
+> ⚠️ 注意精度：界面 `flipDescription()` 标题那一行显示的是 **39.39%（精确 39.3939%）**，而阈值列表行显示 **39.4%**。同一页面两处精度不同，这是 `site/app.mjs:641-666` 的现状。引用"界面原文"时必须用 39.39%，否则录屏时会被抓错。
 贡献拆解（默认状态）：+14.3 / −11.5 / 0.0 / +4.3 = +7.1。
 假设卡：**默认状态指向「成长速度」**（A 9 vs B 5，高 4 分，|贡献| 14.3 最大）；**w=7 状态指向「收入确定性」**（A 4 vs B 8，低 4 分，|贡献| 16.5 最大）。视频与截图脚本里的 w=7 镜头必须用后者。
 
 > ⚠️ 这两个状态的假设卡**不是同一个因素**，是本轮核对时抓到的第一处真实不一致（初稿在 w=7 镜头里错写成「成长速度」）。已按 `core.mjs` 实算结果改正。
 
-> ⚠️ **已知耦合风险（本轮已实际发生一次）**：`story-engineer` 把示例从 3 个扩到 5 个时，**整份替换了 `narrative.mjs`**——原来的 `job` 示例（「要不要换工作」）已不存在，换成 `offer`。本目录所有素材已按 `offer` 重算并全部改过一遍。
+> ⚠️ **已知耦合风险（本轮已实际发生两次）**：
+> 1. `story-engineer` 把示例从 3 个扩到 5 个时**整份替换了 `narrative.mjs`**——`job` 示例（「要不要换工作」）被删，换成 `offer`。
+> 2. 之后 `oldguitar` 的分数也从 71.8/60.0 变成 **74.7/58.9**（我记录过两个版本）。
 >
-> 发布前必须**再核对一次**：运行下面的复核命令，若 `narrative.mjs` 的 `offer` 条目数值变了，`launch_zh.md`、`launch_en.md`、两个视频分镜、`screenshot_plan.md` 里所有引用处都要同步改，不要只改一处。
+> 本目录所有素材已按当前 `offer` 数值重算并改过一遍。**这些示例数据是不稳定的**，发布前必须再跑一次下面的复核命令；若数值变了，`launch_zh.md`、`launch_en.md`、两个分镜、`screenshot_plan.md` 里所有引用处都要同步改，不要只改一处。
 
 ### 复核命令
 

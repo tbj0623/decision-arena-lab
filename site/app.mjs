@@ -382,6 +382,12 @@ function recalc() {
         ? friendlyError(check.code)
         : '上面填好两个方案的名字，结果就会自动出现。';
     }
+    // 因素类错误必须**同时**显示在因素列表下方。
+    // 只放在结果区会把错误推到离问题很远的地方：用户改坏了因素名，
+    // 眼睛却盯着下面的分数区，不知道要去上面找。错误提示应该贴着出错的地方。
+    if (touched && FACTOR_ERROR_CODES.has(check.code)) {
+      showFieldError('#factors-error', friendlyError(check.code));
+    }
     if (pill) pill.hidden = true;
     renderFlipEmpty();
     renderVerifyEmpty();
@@ -423,11 +429,32 @@ function recalc() {
   updateClosenessPill(analysis);
 }
 
+/**
+ * 这些错误属于「因素」区域，提示必须贴着因素列表显示，不能只丢在结果区。
+ *
+ * 为什么：用户改坏了因素名（比如两个因素重名），眼睛却盯着下面的分数区，
+ * 只看结果区的话他不知道要回上面找。错误提示应该贴在出错的地方。
+ */
+const FACTOR_ERROR_CODES = new Set([
+  'DUPLICATE_FACTOR_LABEL',
+  'DUPLICATE_FACTOR_ID',
+  'INVALID_FACTOR_LABEL',
+  'INVALID_FACTOR',
+  'FACTOR_COUNT',
+  'ALL_ZERO_WEIGHTS',
+  'INVALID_WEIGHT',
+  'NEGATIVE_WEIGHT',
+  'WEIGHT_TOO_LARGE',
+]);
+
 function friendlyError(code) {
   switch (code) {
     case 'INVALID_OPTION_LABEL': return '两个方案都要有个名字才能开始算。';
     case 'DUPLICATE_OPTION_LABEL': return '两个方案的名字不能一模一样。';
     case 'INVALID_FACTOR_LABEL': return '每个因素都要有名字。';
+    // 重名不是"不整齐"这么轻的问题：会让翻转卡/贡献表出现两条同名条目，
+    // 用户不知道该调哪一个，核心功能直接失效。所以文案要说清"改成能区分的名字"。
+    case 'DUPLICATE_FACTOR_LABEL': return '有两个因素用了同一个名字。请改成能区分的名字，比如「发展空间（技术）」和「发展空间（管理）」。';
     case 'ALL_ZERO_WEIGHTS': return '所有因素的权重都是 0，没法算。请至少给一个因素加点权重。';
     case 'FACTOR_COUNT': return '因素数量要在 4–6 个之间。';
     case 'RATING_OUT_OF_RANGE': return '评分必须在 0 到 10 之间。';
@@ -551,6 +578,21 @@ function renderContribTable(analysis) {
   // 得分点数的列也必须满足"逐项相加 = 合计"，否则用户一验算就发现对不上
   const shownPointsA = round1SummingTo(analysis.contributions.map((c) => c.pointsA), analysis.scoreA);
   const shownPointsB = round1SummingTo(analysis.contributions.map((c) => c.pointsB), analysis.scoreB);
+  // 占比列也必须满足"逐项相加 = 100.0%"。
+  //
+  // 历史缺陷（product-owner W01-02 真机实测，已修）：
+  // 这一列原本用的是普通 `pct(c.share)`（各自四舍五入到 1 位小数），
+  // 而同一张表的 A/B 分和贡献列已经用了最大余数法。
+  // 6 因素等权时 100/6 = 16.6667%，六行各显示 16.7%，合计 100.2% ——
+  // 而页面下方明写"占比加起来一定是 100%"，用户一验算就发现对不上。
+  // 4 因素、5 因素恰好整除，所以这个问题只在 6 因素时暴露。
+  //
+  // 注意：这里不能用 round1SummingTo（它是"和必须等于指定值"的取整），
+  // 因为 share 是 0–1 的小数，要的是百分比口径。先转成百分数再取整。
+  const shownShares = round1SummingTo(
+    analysis.contributions.map((c) => c.share * 100),
+    100,
+  );
 
   analysis.contributions.forEach((c, i) => {
     const shown = shownDeltas[i];
@@ -565,7 +607,7 @@ function renderContribTable(analysis) {
       : el('td', { text: c.label });
     body.append(el('tr', {},
       nameCell,
-      el('td', { text: pct(c.share) }),
+      el('td', { text: `${fmt1(shownShares[i])}%` }),
       // 关键：这里必须显示「加权后折算进总分的点数」（0–100 量纲），
       // 不能显示原始的 0–10 主观评分，否则这一列加总 ≠ 表尾总分，用户会认为算错
       el('td', { text: fmt1(shownPointsA[i]) }),
@@ -599,7 +641,29 @@ function renderFlip(analysis, thresholds, flip) {
 
   const anyFeasible = thresholds.some((t) => t.feasible);
 
-  if (!anyFeasible) {
+  // 打平是一种**极其容易被翻转**的状态，绝不能归到"翻不过来"里。
+  //
+  // 历史缺陷（ux-writer F-06 发现，已修）：
+  // 原先只看 `anyFeasible`。当所有因素的评分都相同时（d 全为 0），
+  // 每个阈值都是 NO_LEVERAGE（没有杠杆可调），于是 anyFeasible=false，
+  // 页面显示「在只调整单个因素权重的情况下，结论翻不过来。」
+  // 但此刻 A 和 B 分数完全相等 —— 这才是最不稳的状态，
+  // 同一屏上还能看到"领先 0.0 分"和"翻不过来"，两句话互相矛盾。
+  //
+  // 打平必须单独说：现在两边一样，往任一方向调都会立刻分出胜负。
+  if (analysis.tie) {
+    box.append(el('p', { class: 'flip-headline', text: '现在两边分数完全相同——这是最容易翻过去的状态。' }));
+    box.append(el('p', {
+      class: 'result-empty',
+      text: anyFeasible
+        ? '任何一点权重变化都会立刻让某一边领先。所以此刻真正该问的不是"怎么调权重"，而是"我对哪一项最没把握"——去核实那一项。'
+        : '你给两个方案在每个因素上的评分完全一样，所以调权重不会有任何变化（没有哪一项在往里加分）。真正要做的是先把评分打出差别——去核实事实，而不是纠结权重。',
+    }));
+    // 翻转滑块在打平时仍然可玩（能看到"往左偏一点 A 领先、往右偏一点 B 领先"），
+    // 所以这里不 return，继续往下渲染滑杆。
+  }
+
+  if (!anyFeasible && !analysis.tie) {
     box.append(el('p', { class: 'flip-headline', text: '在只调整单个因素权重的情况下，结论翻不过来。' }));
     box.append(el('p', {
       class: 'result-empty',
@@ -663,7 +727,11 @@ function buildThresholdList(thresholds) {
     const name = el('span', { class: 'flip-name', text: t.label });
     let numText = '—';
     if (feasible && t.thresholdShare !== null) {
-      numText = t.direction === 'hold' ? '已打平' : pct(t.thresholdShare);
+      // 精度必须和上面的翻转卡标题一致（那里是 2 位）。
+      // 历史缺陷（growth-producer W02-01 发现）：标题行显示「39.39%（精确 39.3939%）」，
+      // 这张列表却显示「39.4%」——同一页面两种精度，用户会以为是两个不同的数，
+      // 对外素材逐字引用界面时也会因此写错。
+      numText = t.direction === 'hold' ? '已打平' : pct(t.thresholdShare, 2);
     }
     const item = el('li', { class: 'flip-item', dataset: { state: feasible ? 'feasible' : 'infeasible' } },
       name,
@@ -688,10 +756,23 @@ function buildFlipSlider(flip) {
     if (moveSlider) slider.value = String(t * 100);
     const absDiff = Math.abs(projected.difference);
     let verdictText;
-    if (absDiff < 1e-6) verdictText = '两边打平';
+    // 「打平」的判据必须和**显示的差值**一致，不能各说各话。
+    //
+    // 历史缺陷（两轮才修干净，记下来免得再犯）：
+    //   第一轮：判打平用 1e-6，标"就在临界点上"用 5e-4，差 500 倍 → 中间地带文案自相矛盾
+    //   第二轮（改成同源后仍然存在）：判打平用 1e-6（精确值），但显示用 fmt1() 只保留 1 位小数。
+    //     拖到 39.39%（文案自己写的数）时真实 Δ = 0.0026，既不小于 1e-6，
+    //     fmt1 又把它显示成 "0.0" → 屏幕上出现「差 0.0，更倾向「X」」。
+    //     根因不是容差，是**显示精度和被比较的精度不一致**。
+    //
+    // 现在：先算出"用户真正看到的那个数"，用它判断打平。
+    // 显示成 0.0 就必须说打平；显示成 0.1 就不许说打平。
+    const shownAbs = Math.abs(Number(fmt1(absDiff)));
+    const isTie = shownAbs === 0;
+    if (isTie) verdictText = '两边打平';
     else if (projected.difference > 0) verdictText = analysisLabel('A');
     else verdictText = analysisLabel('B');
-    const near = Math.abs(t - flip.thresholdShare) < 5e-4 ? '（就在临界点上）' : '';
+    const near = isTie ? '（就在临界点上）' : '';
     clear(live);
     live.append(
       el('span', { text: `权重占比 ${pct(t, 2)}${near}：` }),
@@ -704,11 +785,24 @@ function buildFlipSlider(flip) {
   // 任何固定刻度都会让它「够不着」。有限刻度下按钮只能改数字、却让滑杆拇指停在原处，
   // 界面就出现两个互相矛盾的位置指示（red-team P0-5）。step="any" 让滑杆精确停在 t*：
   // 拇指位置、输出数字、真实分数三者永远一致。
+  // 滑杆的可访问名。
+  //
+  // 历史缺陷（product-owner W01-02 实测发现）：滑杆没有 aria-label，
+  // 而包着它的 <label> 里同时有说明文字**和** <output> 元素，
+  // 于是屏幕阅读器算出来的名字是「亲手拨一下：…拖到 39.39% 附近看看28.57%」——
+  // 把当前值 "28.57%" 也吞进名字里，而且每次拖动都会变。
+  // 更糟的是有些读屏组合干脆读不出名字，只说"滑块 28"。
+  //
+  // 修法：给滑杆一个稳定的 aria-label（说明它是什么 + 范围），
+  // 把 <output> 移出 <label>（它通过 for= 关联，不需要当 label 的一部分）。
+  const sliderLabelText = `「${flip.label}」的权重占比（0–100%，当前 ${pct(flip.currentShare, 2)}）`;
   const slider = el('input', {
     type: 'range',
     id: sliderId,
     min: '0', max: '100', step: 'any',
     value: String(flip.currentShare * 100),
+    'aria-label': sliderLabelText,
+    'aria-valuetext': pct(flip.currentShare, 2),
     oninput: (e) => {
       try {
         describe(Number(e.target.value) / 100, { moveSlider: false });

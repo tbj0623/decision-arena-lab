@@ -15,19 +15,106 @@ const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const SCAN_DIRS = ['site', 'scripts'];
 const TEXT_EXT = new Set(['.html', '.mjs', '.js', '.css', '.json', '.svg', '.txt', '.md']);
 
-/** 禁止出现的运行时 API / 关键字 */
+/**
+ * 禁止出现的运行时 API / 关键字
+ *
+ * 历史缺陷（red-team V8 发现，已修）：
+ * 早期规则只认「明文标识符 + 明文 URL」，于是 6 类变形写法可以完全绕过，
+ * 让 CI 显示绿色而实际能外发数据：
+ *
+ *   B1  window["fetch"](...)          —— 方括号调用，不匹配 \bfetch\s*\(
+ *   B2  window[\u0066etch](...)       —— Unicode 转义标识符
+ *   B3  eval(atob("ZmV0Y2go..."))     —— 整段代码 base64 编码，无任何明文
+ *   B4  String.fromCharCode(102,101,116,99,104)  —— 拼接函数名
+ *   B5  url(\68 ttps://...)           —— CSS 八进制转义 URL
+ *   B6  onerror="this.src=atob(...)"  —— 无明文 URL，靠 base64 还原
+ *
+ * 修法不是「再加几条正则」——那样永远追不上变体。这里改成**两层防御**：
+ *   第一层：识别「危险的代码能力」本身，而不只是具体函数名
+ *           （eval / Function / atob / fromCharCode / 方括号访问全局对象 /
+ *             任何形式的外部 URL 字面量，包括被转义的）
+ *   第二层：新增「动态执行能力」作为独立的阻断规则
+ *           （只要出现 eval 或 new Function，就要求人工复核，不看它参数是什么）
+ *
+ * 原则：**宁可误报，不可漏报**。这个项目没有正常理由用 eval/atob/fromCharCode。
+ */
 const FORBIDDEN = [
+  // ── 网络请求能力 ──
   { re: /\bfetch\s*\(/, label: 'fetch() 网络请求' },
+  // 方括号调用的 fetch：window["fetch"](...) / globalThis['fetch'](...)
+  // 注意：字符串内容可能是拼接或转义，所以只要求出现 "fetch" 字样的方括号访问
+  { re: /\[\s*['"`](?:fe)?tch['"`]\s*\]/i, label: '方括号调用 fetch' },
+  { re: /\[\s*['"`]fetch['"`]\s*\]/i, label: '方括号调用 fetch' },
   { re: /new\s+XMLHttpRequest\b/, label: 'XMLHttpRequest' },
   { re: /new\s+WebSocket\b/, label: 'WebSocket' },
   { re: /navigator\.sendBeacon\b/, label: 'sendBeacon 遥测' },
+  { re: /new\s+EventSource\b/, label: 'EventSource' },
+  { re: /new\s+Worker\s*\(/, label: 'Worker（可加载远程脚本）' },
+  { re: /\bimport\s*\(\s*['"]https?:/i, label: '动态导入远程模块' },
+  { re: /\bimportScripts\s*\(/, label: 'importScripts' },
+
+  // ── 持久化能力 ──
   { re: /\blocalStorage\b/, label: 'localStorage 持久化' },
   { re: /\bsessionStorage\b/, label: 'sessionStorage 持久化' },
   { re: /\bindexedDB\b/i, label: 'IndexedDB 持久化' },
   { re: /document\.cookie\b/, label: 'cookie 写入' },
-  { re: /new\s+EventSource\b/, label: 'EventSource' },
-  { re: /\bimport\s*\(\s*['"]https?:/i, label: '动态导入远程模块' },
+
+  // ── 动态代码执行能力（B3/B4/B6 的根因）──
+  // 这些能力本身就该被质疑：静态站点没有任何正当理由在运行时求值字符串。
+  { re: /\beval\s*\(/, label: 'eval() 动态执行' },
+  { re: /\bnew\s+Function\s*\(/, label: 'new Function 动态执行' },
+  { re: /\batob\s*\(/, label: 'atob() 解码（常被用于藏 URL/代码）' },
+  { re: /\bbtoa\s*\(/, label: 'btoa() 编码（常被用于藏 URL/代码）' },
+  { re: /String\.fromCharCode\s*\(/, label: 'fromCharCode 拼接（常被用于藏函数名）' },
+  { re: /\bdocument\.write\s*\(/, label: 'document.write 注入' },
+
+  // ── 外部 URL（含被转义的写法）──
   { re: /https?:\/\/(?!127\.0\.0\.1|localhost)[a-z0-9.-]+\//i, label: '外部 URL 引用' },
+  // B5：CSS 八进制/十六进制转义后仍形如 URL。
+  // 关键细节：CSS 八进制转义是 `\68 ` —— 反斜杠 + 八进制数 + **一个空格分隔符**，
+  // 空格之后才是 `ttps://`。所以中间必须允许 \s*，否则 `url(\68 ttps://...)` 抓不到。
+  { re: /\\[0-9a-f]{1,6}\s*ttps?\s*:\s*\/\//i, label: '转义混淆的 URL（八进制/十六进制）' },
+  // 更宽的兜底：任何 css url() 内出现反斜杠转义，都要求人工复核
+  { re: /url\(\s*[^)]*\\[0-9a-f]{1,6}/i, label: 'url() 中包含转义序列（可能用于隐藏 URL）' },
+  // Unicode 转义形式的协议前缀：\u0068ttps:// / \x68ttps://
+  { re: /(?:\\u0068|\\x68)\s*ttps?:\/\//i, label: 'Unicode 转义 URL' },
+  // 协议相对 URL：//evil.example 或 //evil.example/x
+  //
+  // 历史缺陷（QA W02-05 发现的"第 9 类绕过"，已修）：
+  // 原来的规则在域名后强制要求一个 `/`，于是 `<img src="//evil.example">` 这种
+  // **没有尾斜杠**的写法完整漏过。但它在浏览器里完全合法、会真的发请求——
+  // QA 起服务器实测过：页面里放一个 `<img src="//127.0.0.1:8123/?leak=pixel">`，
+  // 浏览器确实发出了跨源请求。指向真实域名就是一次完整的像素追踪外发。
+  //
+  // 修法：结尾的 `/` 改成"域名后可以跟 / : ? # 空白 引号 > 或直接结束"。
+  // 用 lookahead 而不是消费字符，避免把后续内容吃掉影响其它规则匹配。
+  {
+    re: /(?<![:/\\])\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)+(?=[/:?#\s"'`>]|$)/i,
+    label: '协议相对外部 URL',
+  },
+  // JS 字符串/属性里的转义协议前缀：'h\74 tps://' 等
+  { re: /['"`]?[^'"`\s]{0,6}\\[0-9a-f]{1,6}\s*[^'"`\s]{0,4}ttps?\s*:\s*\/\//i, label: '字符串中转义混淆的 URL' },
+
+  // ── 其它真实的出网/泄漏通道（QA W02-05 补充）──
+  // WebRTC 的 STUN 可以拿到用户真实内网 IP，且完全不需要 fetch。
+  { re: /\bRTCPeerConnection\b/, label: 'WebRTC（STUN 可泄漏真实内网 IP）' },
+  // Service Worker 本身同源，但注册后能拦截并改写所有请求。
+  // 单独用不算外发，但它常与其它外发代码配合，且静态站点没有正当理由用。
+  { re: /\bserviceWorker\s*\.\s*register\b/, label: 'Service Worker 注册（可拦截全部请求）' },
+  // dns-prefetch / preconnect：只泄漏"用户访问过本站"，不发数据，但仍是外部主机引用
+  { re: /\b(?:dns-prefetch|preconnect)\b/i, label: 'DNS 预取/预连接（引用外部主机）' },
+];
+
+/**
+ * 单独一类：把「全局对象的方括号访问 + 字符串字面量」当作可疑。
+ * 因为 `window["fetch"]`、`globalThis["XMLHttpRequest"]` 这类写法在静态站点里没有正当用途。
+ * 这条规则不依赖具体是哪个 API 名，所以更难绕过。
+ */
+const SUSPICIOUS_DYNAMIC_ACCESS = [
+  {
+    re: /(?:window|globalThis|self|top|parent|frames)\s*\[\s*['"`]/,
+    label: '全局对象的方括号访问（常用于绕过静态检测）',
+  },
 ];
 
 /** 明显的密钥模式（避免把真 token 提交进仓库） */
@@ -142,25 +229,47 @@ async function main() {
   let scanned = 0;
   let bytes = 0;
 
+  // 审计脚本自身要排除「网络规则」的扫描，但**仍然扫描密钥**。
+  //
+  // 为什么：这个文件的注释里必须写下各种攻击 payload 的样子（否则后人不知道规则在防什么），
+  // 比如 `window["fetch"](...)`、`eval(atob("..."))`。这些是**说明文字**，不是可执行调用。
+  // 如果不排除，脚本会自己抓自己，永远 FAIL，于是维护者只能删掉注释——
+  // 那正好把「这条规则为什么存在」的知识一起删掉了，下次有人就会把它改回去。
+  //
+  // 边界：只对这一个文件跳过网络规则；它对用户不可见（不参与部署，只跑在本地/CI）。
+  // 密钥规则依然生效，防止有人在脚本里硬编码 token。
+  const SELF_PATH = relative(ROOT, fileURLToPath(import.meta.url));
+
   for (const dir of SCAN_DIRS) {
     for await (const file of walk(join(ROOT, dir))) {
       scanned += 1;
       const text = await readFile(file, 'utf8');
       bytes += Buffer.byteLength(text, 'utf8');
+      const rel = relative(ROOT, file);
+      const isSelf = rel === SELF_PATH;
       const lines = text.split(/\r?\n/);
       lines.forEach((line, i) => {
         const scannedLine = scanLine(line);
         if (scannedLine === null) return; // 已确认为纯说明注释
-        for (const { re, label } of FORBIDDEN) {
-          re.lastIndex = 0;
-          if (re.test(scannedLine)) {
-            violations.push({ file: relative(ROOT, file), line: i + 1, label, snippet: line.trim().slice(0, 120) });
+        if (!isSelf) {
+          for (const { re, label } of FORBIDDEN) {
+            re.lastIndex = 0;
+            if (re.test(scannedLine)) {
+              violations.push({ file: rel, line: i + 1, label, snippet: line.trim().slice(0, 120) });
+            }
+          }
+          // 动态访问类：不依赖具体 API 名，专门对付 window["fetch"] / globalThis["..."] 这类绕法
+          for (const { re, label } of SUSPICIOUS_DYNAMIC_ACCESS) {
+            re.lastIndex = 0;
+            if (re.test(scannedLine)) {
+              violations.push({ file: rel, line: i + 1, label, snippet: line.trim().slice(0, 120) });
+            }
           }
         }
         for (const { re, label } of SECRETS) {
           re.lastIndex = 0;
           if (re.test(scannedLine)) {
-            violations.push({ file: relative(ROOT, file), line: i + 1, label, snippet: '[已隐藏]' });
+            violations.push({ file: rel, line: i + 1, label, snippet: '[已隐藏]' });
           }
         }
       });

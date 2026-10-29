@@ -1001,8 +1001,12 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
 .bar-fill {
   height: 100%;
   border-radius: inherit;
-  transition: width .38s cubic-bezier(.22, .8, .3, 1);
+  /* 只过渡 transform / opacity：宽度动画会触发布局重排。
+     JS 直接写 width，所以这里不加 width 过渡 —— 数字与长度始终同步，
+     不会出现"数字已经变了、条子还在慢慢追"的不一致。 */
+  transition: opacity .2s ease;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28);
+  transform-origin: left center;
 }
 .score-row[data-side="A"] .bar-fill { background: var(--a-color); }
 .score-row[data-side="B"] .bar-fill { background: var(--b-color); }
@@ -1295,6 +1299,10 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
   border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
 }
 .flip-item[data-state="infeasible"] {
+  /* 灰底之外再加一层"虚线框"：即使完全看不出颜色差异，
+     实线框 / 虚线框 本身也是两种可区分的形状。 */
+  border-style: dashed;
+  border-color: var(--line-strong);
   background: color-mix(in srgb, var(--bg-sunk) 45%, var(--bg-elev));
 }
 .flip-item .flip-name {
@@ -1846,16 +1854,25 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
 
 /* ---------- 新增：无 JS 兜底提示 ---------- */
 .noscript-banner {
+  position: relative;
   max-width: var(--wrap);
   margin: 1rem auto 0;
-  padding: 1rem 1.2rem;
+  padding: 1.15rem 1.2rem 1rem;
   font-size: .9rem;
   line-height: 1.6;
   color: var(--ink);
   background: var(--warn-soft);
   border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--line));
-  border-left: 4px solid var(--warn);
   border-radius: var(--radius);
+}
+/* 用左上角一小段横线代替整条左边框：同样提示"这是警示"，但不形成 side-tab */
+.noscript-banner::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 1.2rem;
+  width: 34px; height: 3px;
+  border-radius: 0 0 2px 2px;
+  background: var(--warn);
 }
 .noscript-banner strong { color: var(--warn); display: block; margin-bottom: .25em; }
 
@@ -1888,12 +1905,21 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
 
 /* ---------- 新增：高风险领域警示 ---------- */
 .high-risk-banner {
+  position: relative;
   margin: 0 0 1rem;
-  padding: .9rem 1.05rem;
+  padding: 1.05rem 1.05rem .9rem;
   background: var(--danger-soft);
   border: 1.5px solid color-mix(in srgb, var(--danger) 45%, var(--line));
-  border-left: 5px solid var(--danger);
   border-radius: var(--radius-sm);
+}
+/* 同上：左上角短横线提示警示等级，不用整条左边框 */
+.high-risk-banner::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 1.05rem;
+  width: 34px; height: 3px;
+  border-radius: 0 0 2px 2px;
+  background: var(--danger);
 }
 .high-risk-banner p { margin: 0 0 .5em; font-size: .86rem; line-height: 1.6; }
 .high-risk-banner p:last-child { margin-bottom: 0; }
@@ -1912,15 +1938,37 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
   color: var(--danger);
   border-radius: 4px;
 }
-.rating-error {
-  flex: 1 0 100%;
-  margin: .3rem 0 0;
-  font-size: .74rem;
-  line-height: 1.45;
-  color: var(--danger);
-  font-weight: 600;
-}
+
+/*
+  错误提示是 A 行（左半栏）的子元素。它必须横向撑满整个因素卡，
+  否则只能挤在半栏里换行，文字会叠到 B 行的输入框上（D-03）。
+  做法：宽度设成"两份半栏 + 一列间距"，即恰好等于整个 .rating-block 的宽度；
+  它排在 A 列 stepper 之后，垂直位置落在两列 stepper 之下，不会压住 B 列控件。
+*/
+.rating-block { display: flex; flex-wrap: wrap; }
+/* 两列各占一半（减去列间距的一半），与原 grid 布局视觉一致 */
+.rating-block > .rating-row { flex: 0 0 calc(50% - .275rem); }
 .rating-row { flex-wrap: wrap; }
+.rating-row > .rating-error {
+  order: 10;
+  flex: none;
+  width: calc(200% + .55rem);
+  max-width: 100vw;
+  box-sizing: border-box;
+  margin: .35rem 0 0;
+  padding: .4em .55em;
+  font-size: .74rem;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 1px solid color-mix(in srgb, var(--danger) 38%, var(--line));
+  border-radius: var(--radius-xs);
+}
+.rating-row > .rating-error::before {
+  content: "！ ";
+  font-weight: 800;
+}
 
 /* ---------- 新增：权重拉平后的状态提示 ---------- */
 .card-note.subtle {

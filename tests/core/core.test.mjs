@@ -1150,3 +1150,106 @@ test('closeness 分档与 TIE_EPSILON 的语义符合定义', () => {
   assert.equal(tiny.tie, true);
   assert.equal(tiny.winner, 'tie');
 });
+
+/* ─────────────────────────────────────────────────────────────
+ * 回归：因素名称必须唯一（QA W01-07 实测缺陷）
+ *
+ * 缺陷表现（真实复现）：
+ *   两个因素都叫「发展空间」时，翻转卡出现两条同名条目（43.2% 和 15.8%），
+ *   贡献表两行同名（50.0% 和 12.5%），假设卡指向错误的那个。
+ *   用户无法分辨该调哪一个 → "告诉你该调哪个因素"这个核心功能失效。
+ * ───────────────────────────────────────────────────────────── */
+test('因素名称重复时必须报 DUPLICATE_FACTOR_LABEL', () => {
+  const input = {
+    title: 't',
+    options: [{ id: 'A', label: '方案A' }, { id: 'B', label: '方案B' }],
+    factors: [
+      { id: 'f1', label: '发展空间', weight: 3, ratings: { A: 5, B: 5 } },
+      { id: 'f2', label: '发展空间', weight: 3, ratings: { A: 5, B: 5 } },
+      { id: 'f3', label: '收入', weight: 3, ratings: { A: 5, B: 5 } },
+      { id: 'f4', label: '通勤', weight: 3, ratings: { A: 5, B: 5 } },
+    ],
+  };
+  assert.throws(() => normalizeInput(input), (e) => {
+    assert.equal(e.code, 'DUPLICATE_FACTOR_LABEL');
+    return true;
+  });
+});
+
+test('因素名称仅差首尾空白也算重复', () => {
+  const input = {
+    title: 't',
+    options: [{ id: 'A', label: '方案A' }, { id: 'B', label: '方案B' }],
+    factors: [
+      { id: 'f1', label: '发展空间', weight: 3, ratings: { A: 5, B: 5 } },
+      { id: 'f2', label: '发展空间 ', weight: 3, ratings: { A: 5, B: 5 } },
+      { id: 'f3', label: '收入', weight: 3, ratings: { A: 5, B: 5 } },
+      { id: 'f4', label: '通勤', weight: 3, ratings: { A: 5, B: 5 } },
+    ],
+  };
+  assert.throws(() => normalizeInput(input), (e) => e.code === 'DUPLICATE_FACTOR_LABEL');
+});
+
+test('因素名称各不相同则正常通过（不能误伤）', () => {
+  const input = {
+    title: 't',
+    options: [{ id: 'A', label: '方案A' }, { id: 'B', label: '方案B' }],
+    factors: [
+      { id: 'f1', label: '发展空间（技术）', weight: 3, ratings: { A: 5, B: 5 } },
+      { id: 'f2', label: '发展空间（管理）', weight: 3, ratings: { A: 5, B: 5 } },
+      { id: 'f3', label: '收入', weight: 3, ratings: { A: 5, B: 5 } },
+      { id: 'f4', label: '通勤', weight: 3, ratings: { A: 5, B: 5 } },
+    ],
+  };
+  assert.doesNotThrow(() => normalizeInput(input));
+});
+
+/* ─────────────────────────────────────────────────────────────
+ * 回归：不可见字符不得绕过因素重名校验（QA W02-05 发现）
+ *
+ * 缺陷：NFKC + trim 挡得住全角/空格，但挡不住 U+200B（零宽空格）、
+ * U+00AD（软连字符）、U+2060（word joiner）——这些正是从网页/Word/PDF
+ * 复制文本时必带的字符。用户粘贴一个从文档复制的因素名就绕过校验，
+ * 界面上两条看起来完全一样，翻转卡出现两条同名条目。
+ * ───────────────────────────────────────────────────────────── */
+const mkFactors = (labels) => ({
+  title: 't',
+  options: [{ id: 'A', label: '方案A' }, { id: 'B', label: '方案B' }],
+  factors: labels.map((l, i) => ({ id: `f${i + 1}`, label: l, weight: 3, ratings: { A: 5, B: 5 } })),
+});
+
+const INVISIBLE_VARIANTS = [
+  ['零宽空格 U+200B', '发展空间\u200B'],
+  ['软连字符 U+00AD', '发展空间\u00AD'],
+  ['word joiner U+2060', '发展空间\u2060'],
+  ['零宽非连接 U+200C', '发展空间\u200C'],
+  ['BOM U+FEFF', '发展空间\uFEFF'],
+  ['全角空格 U+3000', '发展空间\u3000'],
+];
+
+for (const [name, variant] of INVISIBLE_VARIANTS) {
+  test(`不可见字符 ${name} 不得绕过重名校验`, () => {
+    assert.throws(
+      () => normalizeInput(mkFactors(['发展空间', variant, '丙', '丁'])),
+      (e) => e.code === 'DUPLICATE_FACTOR_LABEL',
+      `${name} 绕过了重名校验`,
+    );
+  });
+}
+
+test('词中制表符与多空格折叠后应判重', () => {
+  assert.throws(
+    () => normalizeInput(mkFactors(['发展 空间', '发展\t空间', '丙', '丁'])),
+    (e) => e.code === 'DUPLICATE_FACTOR_LABEL',
+  );
+  assert.throws(
+    () => normalizeInput(mkFactors(['发展 空间', '发展  空间', '丙', '丁'])),
+    (e) => e.code === 'DUPLICATE_FACTOR_LABEL',
+  );
+});
+
+test('有意义的区分不应误伤（括号 / 大小写）', () => {
+  assert.doesNotThrow(() => normalizeInput(mkFactors(['发展空间（技术）', '发展空间（管理）', '丙', '丁'])));
+  // 不合并大小写是刻意的：中文场景无意义，英文场景可能是有意区分
+  assert.doesNotThrow(() => normalizeInput(mkFactors(['Growth', 'growth', '丙', '丁'])));
+});

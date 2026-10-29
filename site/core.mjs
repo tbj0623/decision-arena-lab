@@ -96,6 +96,18 @@ export function normalizeInput(raw) {
   }
 
   const seenIds = new Set();
+  // 因素名称也必须唯一。
+  //
+  // 为什么（QA 的 W01-07 实测）：两个因素同名时，界面会出现两条同名条目，
+  // 翻转卡列出「发展空间 43.2%」和「发展空间 15.8%」，用户完全无法分辨该调哪一个；
+  // 贡献表两行同名；假设卡甚至可能指向错误的那个（文案说"这一项 A 比 B 高 0 分"，
+  // 但实际命中的是另一个同名因素）。
+  //
+  // 这不是"数据不整齐"这么轻的问题——它让整个"告诉你该调哪个因素"的核心功能失效。
+  // 所以在这里直接拦住，并给出能定位到第几个因素的错误。
+  //
+  // 注意：比较时去掉首尾空白并做 Unicode 归一化，避免"发展空间"和"发展空间 "被当成两个。
+  const seenLabels = new Map();
   const factors = rawFactors.map((factor, index) => {
     if (factor === null || typeof factor !== 'object' || Array.isArray(factor)) {
       fail('INVALID_FACTOR', '因素必须是对象', { index });
@@ -107,6 +119,32 @@ export function normalizeInput(raw) {
       MAX_FACTOR_LABEL,
       { index },
     );
+
+    // 归一化后再比较。必须处理三类"看着一样、字节不一样"的情况：
+    //
+    //   1) 全角/半角（ＮＦＫＣ 负责）
+    //   2) 零宽字符 U+200B / 软连字符 U+00AD / word joiner U+2060 / BOM U+FEFF
+    //      —— 这些是**从网页、Word、PDF 复制文本时最常见的隐形字符**。
+    //      QA 实测：把因素名设成「发展空间\u200B」就能绕过校验，
+    //      而界面上两条看起来完全一样，刚修的那个"同名歧义"bug 原样复现。
+    //      -> 用 \p{Cf}（Unicode 格式字符）全部剥掉
+    //   3) 制表符、连续空格、不换行空格 —— 折叠成单个空格
+    //
+    // 不合并大小写：中文场景无意义；英文场景里 Growth 和 growth 可能是有意区分。
+    const labelKey = label
+      .normalize('NFKC')
+      .replace(/\p{Cf}/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (seenLabels.has(labelKey)) {
+      fail(
+        'DUPLICATE_FACTOR_LABEL',
+        `因素名称不能重复：「${label}」第 ${seenLabels.get(labelKey) + 1} 个和第 ${index + 1} 个同名。` +
+          '请改成能区分的名字（比如「发展空间（技术）」和「发展空间（管理）」）。',
+        { index, label, firstIndex: seenLabels.get(labelKey) },
+      );
+    }
+    seenLabels.set(labelKey, index);
 
     let id = factor.id;
     if (id === undefined || id === null || id === '') {
@@ -430,7 +468,12 @@ export function chooseValidationHypothesis(raw, analysis) {
   return {
     factorId: top.factorId,
     label: factorLabel,
-    question: `你把「${factorLabel}」判成 A 比 B ${directionWord} ${gapText} 分，这条判断对结果的影响最大。它经得起核实吗？`,
+    // 病句修复（ux-writer F-07）：gap === 0 时 directionWord 是"相同"，
+    // 拼出来是「A 比 B 相同 0 分」——中文不通。而且"相同 0 分"本身也自相矛盾
+    // （既然相同，为什么会说差 0 分？）。打平要单独措辞。
+    question: gap === 0
+      ? `你在「${factorLabel}」上给两个方案打的分完全一样，所以这一项对结果的差距没有贡献。这条判断你有多大把握？`
+      : `你把「${factorLabel}」判成 A 比 B ${directionWord} ${gapText} 分，这条判断对结果的影响最大。它经得起核实吗？`,
     steps,
     caveat:
       '这是按"谁对当前差距贡献最大"排出来的启发式提示，不代表客观不确定性，也不是对你个人的判断。改完评分记得回来重算。',
