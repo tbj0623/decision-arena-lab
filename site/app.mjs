@@ -370,6 +370,38 @@ function recalc() {
 
   // 先用业务校验，给出友好提示
   const check = validate(state);
+
+  // 「用户还没开始填」和「填错了」是两件不同的事，不能混在一个分支里。
+  //
+  // 历史缺陷（Lead V9 端到端走查发现）：createEmptyDecision() 返回的
+  // **是完全合法的默认状态**——「方案 A / 方案 B」+ 4 个具名因素（发展空间/稳定性/
+  // 时间成本/兴趣匹配）+ 全 5 分。它当然能通过 validate。
+  // 于是点「清空重来」之后，页面渲染出 50.0 / 50.0 两个分数，
+  // 而"上面填好两个方案的名字"那句提示是隐藏的——
+  // 用户看到的是一个**凭空出现的分数**，而他的标题框是空的。
+  //
+  // 判据：标题空 + 两个方案名还是默认值 → 就是"还没开始"。
+  // 不看因素（因素是预填好的默认值，不是用户输入）。
+  const untouched =
+    !state.title &&
+    state.options[0].label === '方案 A' &&
+    state.options[1].label === '方案 B';
+
+  if (check.ok && untouched) {
+    if (resultBody) resultBody.hidden = true;
+    if (empty) {
+      empty.hidden = false;
+      empty.textContent = '上面填好两个方案的名字，结果就会自动出现。';
+    }
+    if (pill) pill.hidden = true;
+    renderFlipEmpty();
+    renderVerifyEmpty();
+    lastAnalysis = null;
+    lastFlip = null;
+    lastHypothesis = null;
+    return;
+  }
+
   if (!check.ok) {
     // 只有当用户已经填了东西时才显示错误，避免一进页面就红一片
     const touched = state.options[0].label || state.options[1].label || state.options.some((o) => o.label !== '方案 A' && o.label !== '方案 B');
@@ -659,8 +691,24 @@ function renderFlip(analysis, thresholds, flip) {
         ? '任何一点权重变化都会立刻让某一边领先。所以此刻真正该问的不是"怎么调权重"，而是"我对哪一项最没把握"——去核实那一项。'
         : '你给两个方案在每个因素上的评分完全一样，所以调权重不会有任何变化（没有哪一项在往里加分）。真正要做的是先把评分打出差别——去核实事实，而不是纠结权重。',
     }));
-    // 翻转滑块在打平时仍然可玩（能看到"往左偏一点 A 领先、往右偏一点 B 领先"），
-    // 所以这里不 return，继续往下渲染滑杆。
+    box.append(buildThresholdList(thresholds));
+
+    // 打平分支已经把「现在是什么状态」讲清楚了，所以**不要再显示第二条 headline**。
+    // 但滑杆必须保留 —— 打平时拖动滑杆最能说明问题
+    // （往左偏一点 A 领先、往右偏一点 B 领先），砍掉它等于把最有说服力的交互删了。
+    //
+    // 踩过的坑（product-owner 真机 + ux-writer 复核）：这里原先 fall through 到
+    // 下面的通用分支，于是同一张卡里出现两句互相打架的标题。
+    // 我第一次修的时候图省事写了 `return`，那会**连同滑杆一起砍掉** ——
+    // ux-writer 明确指出这一点，已改回"不 return，只是跳过 headline"。
+    //
+    // 同理，打平时 buildThresholdList 已经在上面 append 过，
+    // 下面要跳过，否则列表会出现两遍。
+    if (flip) {
+      const block = buildFlipSlider(flip);
+      if (block) box.append(block);
+    }
+    return;
   }
 
   if (!anyFeasible && !analysis.tie) {
@@ -675,7 +723,7 @@ function renderFlip(analysis, thresholds, flip) {
 
   box.append(el('p', {
     class: 'flip-headline',
-    text: flipDescription(flip),
+    text: flipDescription(flip, analysis),
   }));
 
   box.append(buildThresholdList(thresholds));
@@ -697,9 +745,25 @@ function renderFlip(analysis, thresholds, flip) {
  *   - 明确说明"越靠近越接近打平，越过就翻"
  *   - 不声称滑杆某档能精确命中
  */
-function flipDescription(flip) {
+function flipDescription(flip, analysis) {
   const scope = '（前提：只调这一个因素，其余因素按原来的比例重分剩下的权重）';
-  if (!flip) return `存在可以翻转结论的权重调整。${scope}`;
+
+  // 历史缺陷（product-owner 真机实测发现，已修）：
+  // 原先这里的兜底分支返回"可翻转"的肯定句 —— 而 flip 为 null
+  // **恰恰说明没有可翻转的因素**，等于把语义写反了。
+  // 复现：4 因素、权重全 3、所有评分全 5（全部打平）。
+  // 此时同一屏上同时出现三句互相打架的话：
+  //   「调权重不会有任何变化」        ← 打平分支（对）
+  //   「（兜底分支说）能翻转」        ← 这一行（错）
+  //   「每一项都不会让结果翻转」      ← 阈值列表（对）
+  // 两真一假，而假的那句还带着一长串"前提"限定语，
+  // 看起来反而比真话更权威——这种误导比留白更糟。
+  if (!flip) {
+    if (analysis && analysis.tie) {
+      return `现在两边分数完全相同，而且你给每个因素的评分也一样，所以调整权重不会改变任何东西——没有哪一项在往里加分。想真正改变结论，需要先去核实事实、把评分打出差别，而不是继续调权重。${scope}`;
+    }
+    return `在你目前打的这些分数下，无论怎么调整单个因素的权重，结论都翻不过来。${scope}`;
+  }
 
   const cur = pct(flip.currentShare, 1);
   const thr = pct(flip.thresholdShare, 2);
@@ -794,7 +858,14 @@ function buildFlipSlider(flip) {
   // 更糟的是有些读屏组合干脆读不出名字，只说"滑块 28"。
   //
   // 修法：给滑杆一个稳定的 aria-label（说明它是什么 + 范围），
-  // 把 <output> 移出 <label>（它通过 for= 关联，不需要当 label 的一部分）。
+  // 并把 <output> 从 <label> 里挪出来。
+  //
+  // 为什么必须挪出来（product-owner 复查发现我第一版没做到）：
+  // <label> 里的所有文本（含 <output> 的当前值）都会被算进滑杆的可访问名。
+  // 于是名字变成「…拖到 39.39% 附近看看28.57%」——**当前值被吞进名字里**，
+  // 而且每拖动一次名字就变一次。读屏用户听到的会是一个不断变长的名字。
+  // 现在 <output> 放在 label 外面，靠 for= 与滑杆关联，
+  // 它是"值"的显示，不该是"名字"的一部分。
   const sliderLabelText = `「${flip.label}」的权重占比（0–100%，当前 ${pct(flip.currentShare, 2)}）`;
   const slider = el('input', {
     type: 'range',
@@ -823,8 +894,9 @@ function buildFlipSlider(flip) {
   block.append(
     el('label', { for: sliderId },
       el('span', {}, '亲手拨一下：把「', el('strong', { text: flip.label }), '」的权重占比拖到 ',
-        pct(flip.thresholdShare, 2), ' 附近看看'),
-      out),
+        pct(flip.thresholdShare, 2), ' 附近看看')),
+    // <output> 在 <label> 之外：它是当前值的显示，不是控件名字的一部分
+    out,
     slider,
     live);
 
@@ -1027,6 +1099,142 @@ function resetAll() {
   window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
 }
 
+/* ───────────── 首屏真实交互示例 ─────────────
+ *
+ * V9 P0-C 要求：首屏右侧那张卡必须是**真实计算支撑的可交互产品示例**，
+ * 数字来自 site/core.mjs，不能像设计原型那样写死 `a = 40 + 50t`。
+ *
+ * 实现要点：
+ *  - 数据取自 EXAMPLES[0]（offer），与工作区点开的是同一份
+ *  - 拖动滑杆 = 调「第一个因素」的权重占比，其余因素按原比例重分，
+ *    用的就是工作区同一个 projectAtShare，所以数字必然一致
+ *  - 不新建第二套算法，也不缓存一份"演示用的结果"
+ */
+const HERO_DEMO_KEY = 'offer';
+
+function initHeroDemo() {
+  const box = $('#hero-demo');
+  if (!box) return;
+
+  const example = EXAMPLES.find((e) => e.key === HERO_DEMO_KEY) || EXAMPLES[0];
+  if (!example) return;
+  const input = cloneBody(example.body);
+
+  // 找"最容易被撬动"的那个因素作为演示旋钮 —— 它最能说明问题
+  const thresholds = findFlipThresholds(input);
+  const highlight = pickFlipHighlight(thresholds);
+  const knobFactor = highlight
+    ? input.factors.find((f) => f.id === highlight.factorId) || input.factors[0]
+    : input.factors[0];
+
+  const titleEl = $('#hero-demo-title');
+  const labelEl = $('#hero-slider-label');
+  const outEl = $('#hero-slider-out');
+  const slider = $('#hero-slider');
+  const scoreA = $('#hero-score-a');
+  const scoreB = $('#hero-score-b');
+  const barA = $('#hero-bar-a');
+  const barB = $('#hero-bar-b');
+  const verdict = $('#hero-verdict');
+  if (!slider || !titleEl) return;
+
+  titleEl.textContent = example.body.title;
+  labelEl.textContent = `调整「${knobFactor.label}」的权重占比`;
+  // 侧栏显示真实方案名，让用户立刻看到这是他自己的两个选项
+  const [optA, optB] = input.options;
+  const aLabel = box.querySelector('[data-side="A"] .hero-demo-score-label');
+  const bLabel = box.querySelector('[data-side="B"] .hero-demo-score-label');
+  if (aLabel) aLabel.textContent = optA.label;
+  if (bLabel) bLabel.textContent = optB.label;
+
+  // 初始位置取当前真实占比，而不是随便给个 50%
+  const base = scoreDecision(input);
+  const baseShare = base.contributions.find((c) => c.factorId === knobFactor.id)?.share ?? 0.5;
+  slider.value = String(baseShare * 100);
+
+  function paint(opts = {}) {
+    const { announce = true } = opts;
+    const share = Number(slider.value) / 100;
+    let projected;
+    try {
+      projected = projectAtShare(input, knobFactor.id, share);
+    } catch {
+      return; // 极端值下不更新，保持上一帧
+    }
+    const a = projected.scoreA;
+    const b = projected.scoreB;
+    const diff = Math.abs(projected.difference);
+
+    scoreA.textContent = fmt1(a);
+    scoreB.textContent = fmt1(b);
+    barA.style.width = `${Math.max(0, Math.min(100, a))}%`;
+    barB.style.width = `${Math.max(0, Math.min(100, b))}%`;
+    outEl.textContent = `${pct(share, 1)}`;
+
+    // 读屏要能听到"当前值代表什么"，光念「39.4」没有意义。
+    // （ux-writer 指出：不加这个，读屏只说"39.4"）
+    slider.setAttribute('aria-valuetext', `「${knobFactor.label}」权重占比 ${pct(share, 1)}`);
+
+    // aria-live 的播报策略：拖动过程中**不**逐格播报长句。
+    // 拖动时每秒会触发几十次 input，若每次都更新 live 区域，
+    // 读屏会被一整串重复的"此刻更倾向…差…分"淹没，反而听不到有用信息。
+    // 所以：input 时只更新视觉数字，松手（change）时才更新这段文字。
+    if (!announce) return;
+
+    // 「打平」的判据必须和**显示的差值**一致。
+    //
+    // 踩过两个坑：
+    //   1) projectAtShare 返回的字段是 { scoreA, scoreB, difference, share }，
+    //      **没有 tie 字段**（scoreDecision 才有）。我一开始写 projected.tie，
+    //      永远 undefined → 打平分支从不触发，页面打出「差 0.0 分」却不说是打平。
+    //   2) 即使改用精确的 |Δ| < TIE_EPSILON 也不行：滑杆是 step="any"，
+    //      用户很难停在精确的 39.393939%，通常会停在 39.39% 附近（Δ≈2.6e-7），
+    //      界面却把差值四舍五入显示成「0.0」。显示 0.0 就必须说打平，不能自相矛盾。
+    //
+    // 所以统一用「显示出来的那个数」做判据 —— 和工作区滑杆用的是同一个规则。
+    const shownDiff = Number(fmt1(diff));
+    const isTie = shownDiff === 0;
+
+    if (isTie) {
+      verdict.textContent = '两个方案打平了——这是最容易被撬动的时刻。';
+      verdict.dataset.state = 'tie';
+    } else {
+      const leading = projected.difference > 0 ? optA.label : optB.label;
+      verdict.textContent = `此刻更倾向「${leading}」，差 ${fmt1(diff)} 分。`;
+      verdict.dataset.state = 'lead';
+    }
+  }
+
+  // 拖动中：只动数字，不播报；松手：更新播报文字
+  slider.addEventListener('input', () => paint({ announce: false }));
+  slider.addEventListener('change', () => paint({ announce: true }));
+  paint();
+
+  // 「30 秒看懂示例」：把这条示例真正载入工作区并滚过去，
+  // 而不是仅仅滚动到示例列表（那样用户还得再点一次）。
+  for (const btn of document.querySelectorAll('[data-action="demo-run"]')) {
+    btn.addEventListener('click', () => {
+      loadExample(example.key);
+      const ws = $('#workspace');
+      if (ws) {
+        ws.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
+      }
+      // 键盘用户点完这个按钮，焦点还停在按钮上；页面滚到了工作区，
+      // 但他们接下来的 Tab 会从源位置继续，感觉像"跳过去了但没跟过来"。
+      // 把焦点送到工作区标题（可聚焦但不可编辑，读屏会念出"你的决策台"），
+      // 让 tab 顺序从用户眼前的位置继续。
+      // （ux-writer 建议）
+      setTimeout(() => {
+        const heading = $('#workspace-title');
+        if (heading) {
+          heading.setAttribute('tabindex', '-1');
+          heading.focus({ preventScroll: true });
+        }
+      }, prefersReducedMotion() ? 0 : 420);
+    });
+  }
+}
+
 /* ───────────── 事件绑定 ───────────── */
 
 function bindEvents() {
@@ -1144,6 +1352,8 @@ function boot() {
   renderExamples();
   bindEvents();
   renderAll();
+  // 首屏真实交互示例要在示例数据渲染之后初始化（它要读 EXAMPLES）
+  initHeroDemo();
 }
 
 if (document.readyState === 'loading') {

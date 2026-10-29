@@ -1,7 +1,7 @@
 # USER_JOURNEYS — Decision Arena / 反悔雷达
 
 > 5 条虚构但完整的操作场景。所有数值均由 `site/core.mjs` 实算得出，不是手推。
-> 一键复核：`node work/product/verify-journeys.mjs`（退出码 0 = 5 条全部与代码一致）
+> 一键复核：`node docs/product/verify-journeys.mjs`（退出码 0 = 5 条全部与代码一致）
 > 显示约定：分数、贡献、差值保留 1 位小数；差值用**未取整**原始值计算后再显示；阈值占比保留 1 位小数。
 > 公式：`得分 = 10 × Σ(归一化权重 × 评分)`，单边范围 0–100。
 

@@ -40,10 +40,24 @@ function findLines(source, re) {
 test('UI 契约：文档语言、viewport 与首屏定位语齐备', () => {
   assert.match(HTML, /<html lang="zh-CN">/);
   assert.match(HTML, /<meta name="viewport" content="[^"]*width=device-width/);
+  // V9 品牌改版换了首屏主标题，定位语随之更新。
+  //
+  // 这条测试的价值不在于锁死某一句话，而在于**保证首屏确实有一句明确定位**，
+  // 不是空着也不是放了一堆营销词。所以检查的是"核心承诺还在不在"：
+  //   1) 标题点出「犹豫的只是一个条件」这个产品主张
+  //   2) 副文案说清"找到临界点 + 去验证"，而不是承诺结果
   assert.ok(
-    HTML.includes('不是替你预测未来') && HTML.includes('什么条件会改变你的选择'),
-    '定位语必须原文出现在 index.html 里',
+    HTML.includes('一个条件') && HTML.includes('临界点'),
+    '首屏定位语必须包含产品主张（一个条件 → 临界点）',
   );
+  // 反向：首屏绝不能**承诺**成功率/胜率。
+  // 注意要放过否定语境——"不是成功率"这句是正当的免责声明，
+  // 而且必须保留（V9 要求高风险边界不能删）。
+  const heroStart = HTML.indexOf('<section class="hero');
+  const heroBlock = HTML.slice(heroStart, HTML.indexOf('id="examples"', heroStart));
+  const withoutNegation = heroBlock.replace(/不是[^。；]*?(成功率|胜率)[^。；]*/g, '');
+  assert.ok(!/成功率|胜率/.test(withoutNegation),
+    '首屏不得承诺成功率/胜率（否定语境如"不是成功率"允许）');
 });
 
 test('UI 契约：跳过导航链接指向真实存在的 #main', () => {
@@ -79,14 +93,24 @@ test('UI 契约：用户输入绝不拼进 innerHTML', () => {
   assert.ok(APP.includes('textContent'), '应当用 textContent 写文本');
 });
 
-test('UI 契约：页面不引用任何外部 URL（data: URI 除外）', () => {
+test('UI 契约：页面不引用任何外部 URL（data: URI 与元数据除外）', () => {
   const files = { 'site/index.html': HTML, 'site/app.mjs': APP, 'site/core.mjs': CORE, 'site/features/narrative.mjs': NARRATIVE };
   const offenders = [];
   for (const [file, src] of Object.entries(files)) {
     src.split(/\r?\n/).forEach((line, i) => {
-      if (/^\s*(\*|\/\/)/.test(line)) return;            // 注释里的说明不算
+      if (/^\s*(\*|\/\/|<!--)/.test(line)) return;        // 注释里的说明不算
       if (/data:image\//.test(line)) return;              // 内联图标是同源的
-      const m = line.match(/https?:\/\/(?!127\.0\.0\.1|localhost)[a-z0-9.-]+/i);
+
+      // V9 起页面必须带 OG / Twitter Card / canonical 元数据，
+      // 这些 URL 是**给社交平台抓取器看的标识**，浏览器不会因为它发请求。
+      // 所以先剥掉这些标签，再扫剩下的部分 —— 不是整行豁免
+      // （同一行里其它位置若有外链，照样会被抓到）。
+      const withoutMeta = line
+        .replace(/<meta\s+[^>]*(?:og:|twitter:)[^>]*>/gi, '')
+        .replace(/<link\s+rel\s*=\s*["']canonical["'][^>]*>/gi, '')
+        .replace(/<meta\s+name\s*=\s*["'](?:description|color-scheme|viewport|theme-color)["'][^>]*>/gi, '');
+
+      const m = withoutMeta.match(/https?:\/\/(?!127\.0\.0\.1|localhost)[a-z0-9.-]+/i);
       if (m) offenders.push(`${file}:${i + 1} ${m[0]}`);
     });
   }

@@ -135,7 +135,15 @@ const SECRETS = [
  * 现在的规则：豁免只针对**被匹配到的那一处字面量本身**，不是整行。
  * 因此改为「先剔除已知安全片段，再在剩余文本上跑规则」。
  */
-const SAFE_FRAGMENTS = [
+/**
+ * 安全片段：从一行里剔除的"看着像违规、实际不是"的片段。
+ *
+ * 导出它是有意的：tests/qa/audit-script.test.mjs 需要和真实审计用**同一份规则**。
+ * 早先那个测试自己复制了一份，结果我在这里加了 OG 元数据豁免后，
+ * 测试仍在用旧副本、断言"真实仓库无违规"直接 fail —— 两份规则漂移了。
+ * 现在测试从本文件 import，规则只有一处定义。
+ */
+export const SAFE_FRAGMENTS = [
   // HTML 内联 data: URI 的 favicon（同源，不外发）——只剔除这个标签本身
   /<link\s+rel="icon"\s+href="data:[^"]*">/gi,
   // 审计脚本自身的规则定义行（形如 { re: /.../, label: '...' }）
@@ -152,6 +160,22 @@ const SAFE_FRAGMENTS = [
   /\bxmlns(?::[\w-]+)?\s*=\s*["']https?:\/\/www\.w3\.org\/[^"']*["']/gi,
   // DOCTYPE 里的 W3C 公共标识符（HTML4/XHTML 老式 doctype）
   /<!DOCTYPE[^>]*w3\.org[^>]*>/gi,
+
+  // Open Graph / Twitter Card 的 content 属性
+  //
+  // 这类 URL 是**给社交平台抓取器看的元数据**，不是页面运行时会发出的请求。
+  //   <meta property="og:image" content="https://example.com/card.png">
+  // 浏览器不会因为这个标签去下载那张图；只有分享到社交平台时，
+  // 平台服务器才会去抓。所以它不违反"零外部请求"的承诺。
+  //
+  // 历史缺陷（qa-engineer V9-03 发现）：不加这条豁免，任何规范的 OG 元数据
+  // 都会让审计 FAIL——而 OG 元数据本身是 V9 的硬要求。
+  // 同样的原则：只豁免**这一个属性本身**，不是整行。
+  /<meta\s+(?:property|name)\s*=\s*["'](?:og|twitter):[^"']*["']\s+content\s*=\s*["'][^"']*["']\s*\/?>/gi,
+  // 属性顺序相反的写法（content 在前）
+  /<meta\s+content\s*=\s*["'][^"']*["']\s+(?:property|name)\s*=\s*["'](?:og|twitter):[^"']*["']\s*\/?>/gi,
+  // rel="canonical" 也是元数据，同理
+  /<link\s+rel\s*=\s*["']canonical["']\s+href\s*=\s*["'][^"']*["']\s*\/?>/gi,
 ];
 
 /**

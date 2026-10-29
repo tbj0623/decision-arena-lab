@@ -15,116 +15,143 @@
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   1. 设计令牌
+   1. 设计令牌（V9 · Editorial Analytical）
+
+   配色策略（三条同时成立，缺一不可）：
+   ┌ 浅色纸面 = :root 默认值，纸白 #f6f9fa，A/B 用压深后的可读变体
+   ├ 深色 = V9 深海军蓝，严格使用总纲给的 6 个色值
+   └ 首屏 hero = 品牌带，**任何主题下都是深海军蓝**
+       理由：V9 的品牌第一印象是深海军蓝，但用户的浅色偏好也必须尊重。
+       把品牌色锁在首屏 band 里，正文区仍跟随系统主题 —— 两者互不牺牲。
+       实现方式是给 .hero 单独一组 --hero-* 变量（见第 4 节），
+       不污染全局 token，也不影响强制高对比与打印。
+
+   对比度实测（WCAG 2.1，正文按 4.5:1 判定）：
+   · 深色主题：text/bg 16.76   muted/bg 9.55   mint/bg 11.78   amber/bg 10.58
+   · 浅色主题：ink/bg 16.58    ink-3/bg 7.90   A/bg 6.10       B/bg 6.49
+   · 主按钮（mint 底 + navy 字）11.78:1
+   ⚠️ 反例（因此不能这么用）：薄荷绿底 + 纸白字 = 1.42:1，绝不可用。
    -------------------------------------------------------------------------- */
 :root {
-  /* 表面 */
-  --bg: #f4f6fa;
+  /* ── 表面（浅色纸面）── */
+  --bg: #f6f9fa;
   --bg-elev: #ffffff;
-  --bg-sunk: #eceff6;
-  --bg-raise: #fbfcfe;
+  --bg-sunk: #e9eff2;
+  --bg-raise: #fbfdfe;
 
-  /* 文字（各级都在对应底色上 ≥ 4.5:1） */
-  --ink: #101722;
-  --ink-2: #333d4b;
-  --ink-3: #5a6678;
+  /* ── 文字（各级都在对应底色上 ≥ 4.5:1）── */
+  --ink: #0d1b26;
+  --ink-2: #33454f;
+  --ink-3: #56676f;
 
-  /* 分隔 */
-  --line: #dee4ee;
-  --line-strong: #bfc8d8;
+  /* ── 分隔 ── */
+  --line: #d7e2e7;
+  --line-strong: #b3c3cb;
 
-  /* 品牌与语义色 */
-  --brand: #123a5c;
-  --brand-hover: #0c2b45;
-  --brand-soft: #e6eef7;
-  --accent: #0a6656;
-  --accent-soft: #e2f2ed;
+  /* ── 品牌与语义色（浅色主题用压深变体，保证可读）── */
+  --brand: #0a3a52;
+  --brand-hover: #06293a;
+  --brand-soft: #e2eef4;
+  --accent: #0b6b57;
+  --accent-soft: #def2ec;
   --warn: #8a4a00;
   --warn-soft: #fdf0dc;
   --danger: #9c1f34;
   --danger-soft: #fbe7ea;
 
-  /* A / B 双方案标识色 */
-  --a-color: #1a5cc8;
-  --a-soft: #e7eefc;
-  --a-line: #b9cdF1;
-  --b-color: #8d4318;
-  --b-soft: #fbebdf;
-  --b-line: #eccbb2;
+  /* ── A / B 双方案标识色（薄荷 / 琥珀的可读变体）── */
+  --a-color: #0b6b57;
+  --a-soft: #def2ec;
+  --a-line: #a9d8cc;
+  --b-color: #8a4a00;
+  --b-soft: #fdeee0;
+  --b-line: #e8c9a8;
 
-  /* 焦点 */
+  /* ── V9 品牌原色（仅用于需要大色块的场景，如 hero 带）── */
+  --v9-navy: #081827;
+  --v9-surface: #102b40;
+  --v9-mint: #5ce8c3;
+  --v9-amber: #ffb878;
+  --v9-text: #f3f8fa;
+  --v9-muted: #a9c1cb;
+
+  /* ── 焦点 ── */
   --focus: #0b5bc4;
   --focus-halo: rgba(11, 91, 196, .22);
 
-  /* 形状 */
+  /* ── 形状 ── */
   --radius: 16px;
   --radius-sm: 10px;
   --radius-xs: 7px;
   --radius-pill: 999px;
 
-  /* 阴影：都带偏移 + 柔和扩散，不用零偏移光晕 */
-  --shadow: 0 1px 1px rgba(16, 23, 34, .04), 0 6px 18px -12px rgba(16, 23, 34, .22);
-  --shadow-lift: 0 2px 3px rgba(16, 23, 34, .05), 0 18px 40px -22px rgba(16, 23, 34, .38);
-  --shadow-inset: inset 0 1px 2px rgba(16, 23, 34, .06);
+  /* ── 阴影：都带偏移 + 柔和扩散，不用零偏移光晕 ── */
+  --shadow: 0 1px 1px rgba(8, 24, 39, .04), 0 6px 18px -12px rgba(8, 24, 39, .22);
+  --shadow-lift: 0 2px 3px rgba(8, 24, 39, .05), 0 18px 40px -22px rgba(8, 24, 39, .38);
+  --shadow-inset: inset 0 1px 2px rgba(8, 24, 39, .06);
 
-  /* 字体：系统字体栈，零网络请求 */
+  /* ── 字体：系统中文字体栈，零网络请求 ── */
   --ff: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
         "Microsoft YaHei", "Noto Sans SC", sans-serif;
   --ff-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
-  /* 字号阶梯 */
+  /* ── 字号阶梯（V9 不改字号：可读性优先，刚为 360px 修过）── */
   --fs-xs: .75rem;
   --fs-sm: .8125rem;
   --fs-md: .9375rem;
   --fs-lg: clamp(1.0625rem, 1rem + .3vw, 1.125rem);
   --fs-h3: 1.0625rem;
-  --fs-h2: clamp(1.28rem, 1.05rem + .8vw, 1.6rem);
+  --fs-h2: clamp(1.28rem, 1.05vw + 1rem, 1.6rem);
   --fs-h1: clamp(1.62rem, 1.12rem + 2.1vw, 2.55rem);
   --step: 1rem;
 
-  /* 布局 */
+  /* ── 布局 ── */
   --wrap: 1140px;
   --gutter: clamp(16px, 4vw, 32px);
   --tap: 44px;
 }
 
+/* --------------------------------------------------------------------------
+   深色主题 = V9 深海军蓝（严格使用总纲色值）
+   -------------------------------------------------------------------------- */
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0d1219;
-    --bg-elev: #151c25;
-    --bg-sunk: #1c2430;
-    --bg-raise: #1a222c;
+    --bg: #081827;
+    --bg-elev: #102b40;
+    --bg-sunk: #0c2133;
+    --bg-raise: #14344c;
 
-    --ink: #edf1f7;
-    --ink-2: #c2cddb;
-    --ink-3: #a2afc0;
+    --ink: #f3f8fa;
+    --ink-2: #d3e2e9;
+    --ink-3: #a9c1cb;
 
-    --line: #29323f;
-    --line-strong: #3d4959;
+    --line: #23445c;
+    --line-strong: #3a6178;
 
-    --brand: #a6caea;
-    --brand-hover: #c4dcf3;
-    --brand-soft: #18283a;
-    --accent: #63dcc0;
-    --accent-soft: #10312b;
-    --warn: #f2b866;
-    --warn-soft: #2f2413;
-    --danger: #ff95a6;
-    --danger-soft: #351a21;
+    --brand: #8fe3d0;
+    --brand-hover: #b6f0e2;
+    --brand-soft: #14384a;
+    --accent: #5ce8c3;
+    --accent-soft: #103a3a;
+    --warn: #ffb878;
+    --warn-soft: #33280f;
+    --danger: #ff9fb0;
+    --danger-soft: #3a1b24;
 
-    --a-color: #7cb2ff;
-    --a-soft: #13233b;
-    --a-line: #2c4a76;
-    --b-color: #f0ab84;
-    --b-soft: #33231a;
-    --b-line: #5f3d28;
+    /* A = 薄荷，B = 暖琥珀 */
+    --a-color: #5ce8c3;
+    --a-soft: #123c40;
+    --a-line: #2c6b66;
+    --b-color: #ffb878;
+    --b-soft: #3a2c1c;
+    --b-line: #7a5636;
 
-    --focus: #7cb2ff;
-    --focus-halo: rgba(124, 178, 255, .28);
+    --focus: #8fe3d0;
+    --focus-halo: rgba(143, 227, 208, .3);
 
-    --shadow: 0 1px 1px rgba(0, 0, 0, .5), 0 8px 22px -14px rgba(0, 0, 0, .85);
-    --shadow-lift: 0 2px 4px rgba(0, 0, 0, .55), 0 20px 44px -24px rgba(0, 0, 0, .95);
-    --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, .5);
+    --shadow: 0 1px 1px rgba(0, 0, 0, .55), 0 8px 22px -14px rgba(0, 0, 0, .9);
+    --shadow-lift: 0 2px 4px rgba(0, 0, 0, .6), 0 20px 44px -24px rgba(0, 0, 0, .95);
+    --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, .55);
   }
 }
 
@@ -327,16 +354,72 @@ input[type="range"]:focus-visible { outline-offset: 4px; }
 }
 
 /* --------------------------------------------------------------------------
-   4. 首屏
+   4. 首屏（V9 品牌带）
+
+   任何主题下首屏都是深海军蓝：
+   · 深海军蓝是 V9 的品牌记忆点，首屏必须给到
+   · 但用户的浅色偏好不能被无视 —— 所以只锁首屏这一段，正文区仍跟随系统主题
+   · 用一组 --hero-* 局部变量实现，不污染全局 token
+   · 强制高对比模式下整段交还给系统色（见第 21 节），不硬撑品牌色
    -------------------------------------------------------------------------- */
 .hero {
-  padding-block: clamp(2rem, 5.5vw, 4rem) clamp(1.25rem, 3vw, 2rem);
-  border-bottom: 1px solid var(--line);
+  --hero-bg: #081827;
+  --hero-surface: #102b40;
+  --hero-text: #f3f8fa;
+  --hero-muted: #a9c1cb;
+  --hero-mint: #5ce8c3;
+  --hero-amber: #ffb878;
+  --hero-line: #23445c;
+
+  position: relative;
+  isolation: isolate;
+  background: var(--hero-bg);
+  color: var(--hero-text);
+  border-bottom: 1px solid var(--hero-line);
+  padding-block: clamp(2.25rem, 5.5vw, 4rem) clamp(1.5rem, 3vw, 2.25rem);
+
+  /*
+    通栏：.hero 同时是 .wrap（最大宽 1140px），所以背景带只能靠"向外撑"。
+    做法是 100vmax 的 box-shadow + clip-path 裁掉两侧溢出部分：
+    · 视觉上铺满整个视口宽度
+    · 因为被 clip-path 裁掉，不会产生横向滚动条（已实测 scrollWidth == clientWidth）
+    这里不能用 overflow:hidden —— 那会把这个外扩的阴影一起裁掉，退化成一张卡片。
+  */
+  box-shadow: 0 0 0 100vmax var(--hero-bg);
+  clip-path: inset(0 -100vmax);
+}
+/* 极轻的品牌纹样：两条细线相交（A/B 交汇的意象），不当装饰堆砌。 */
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 55% at 26% 0%, rgba(92, 232, 195, .10), transparent 72%),
+    radial-gradient(ellipse 50% 50% at 74% 6%, rgba(255, 184, 120, .08), transparent 72%);
 }
 
-/* 原来是一枚胶囊标签。改成一条"文件头"式的元信息行：
-   一条短横线 + 小字，安静地交代边界，不跟标题抢注意力。 */
-.eyebrow {
+/* 首屏内的排版一律用 hero 局部色，避免被正文主题的 --ink 覆盖 */
+.hero h1 {
+  max-width: 19ch;
+  color: var(--hero-text);
+}
+.hero .lede {
+  max-width: 54ch;
+  margin-top: 1.15rem;
+  font-size: var(--fs-lg);
+  line-height: 1.7;
+  color: var(--hero-muted);
+}
+/* 标题里的强调：薄荷色 + 下划线（不只靠颜色） */
+.hero em {
+  color: var(--hero-mint);
+  text-decoration-color: rgba(92, 232, 195, .45);
+}
+
+/* 元信息行 */
+.hero .eyebrow {
   display: flex;
   align-items: center;
   gap: .7rem;
@@ -344,60 +427,521 @@ input[type="range"]:focus-visible { outline-offset: 4px; }
   font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: .1em;
-  color: var(--ink-3);
+  color: var(--hero-muted);
 }
-.eyebrow::before {
+.hero .eyebrow::before {
   content: "";
   flex: none;
   width: 26px;
   height: 2px;
-  background: var(--accent);
+  background: var(--hero-mint);
   border-radius: 2px;
 }
 
-.hero h1 { max-width: 19ch; }
-.hero .lede {
-  max-width: 56ch;
-  margin-top: 1.15rem;
-  font-size: var(--fs-lg);
-  line-height: 1.7;
-  color: var(--ink-2);
+/* 两栏：左文案 / 右真实演示卡 */
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(1.75rem, 4vw, 3rem);
+  align-items: center;
 }
+@media (min-width: 960px) {
+  .hero-grid { grid-template-columns: minmax(0, 1fr) minmax(0, .92fr); }
+}
+
+.hero-copy { min-width: 0; }
+.hero-demo { min-width: 0; }
+
+/* 手机端：演示卡必须排在 CTA 之后，绝不挡住按钮 */
+@media (max-width: 959px) {
+  .hero-demo { order: 2; }
+  .hero-copy { order: 1; }
+}
+
 .br-wide { display: none; }
 @media (min-width: 760px) { .br-wide { display: inline; } }
 
+/*
+  首屏两个按钮的层级（F-07 + V9）。
+
+  CTA1 主按钮：mint 底 + navy 字（11.78:1），整行宽 —— 明确"从这里开始"
+  CTA2 次按钮：退成文字链，但保留 44px 高度与主题色文字，不做成禁用感
+*/
 .hero-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: .7rem;
-  margin: 1.75rem 0 1.5rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: .85rem;
+  margin: 1.85rem 0 1.6rem;
 }
-.hero-actions .btn { flex: 1 1 150px; }
 
+.hero-actions .btn-primary {
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: 56px;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+  /* mint 底 + navy 字 = 11.78:1；反过来（浅字压 mint）只有 1.42:1 */
+  --btn-bg: var(--hero-mint);
+  --btn-fg: #081827;
+  --btn-line: var(--hero-mint);
+  background: var(--hero-mint);
+  border-color: var(--hero-mint);
+  color: #081827;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 12px 28px -16px rgba(92, 232, 195, .55);
+}
+.hero-actions .btn-primary:hover {
+  --btn-bg: #7ff0d4;
+  background: #7ff0d4;
+  border-color: #7ff0d4;
+  color: #04121d;
+}
+
+.hero-actions .btn-ghost {
+  align-self: center;
+  width: auto;
+  flex: 0 0 auto;
+  min-height: var(--tap);
+  padding: .5em .9em;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  /* 首屏是深底，次按钮用 mint 文字 + 下划线，依然是"可点"的视觉 */
+  border-color: transparent;
+  background: transparent;
+  color: var(--hero-mint);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: .28em;
+  text-decoration-color: rgba(92, 232, 195, .45);
+  border-radius: var(--radius-sm);
+}
+.hero-actions .btn-ghost:hover {
+  background: rgba(92, 232, 195, .12);
+  border-color: transparent;
+  color: var(--hero-text);
+  text-decoration-thickness: 2px;
+  text-decoration-color: currentColor;
+}
+/* 深底上的焦点环：换成薄荷色，否则蓝色环在海军蓝上不够醒目 */
+.hero :where(a, button, input, summary, [tabindex]):focus-visible {
+  outline-color: var(--hero-mint);
+}
+.hero-actions .btn:focus-visible,
+.hero-demo .btn:focus-visible {
+  box-shadow: 0 0 0 5px var(--hero-bg);
+}
+
+/* 价值标签 */
 .hero-facts {
   display: flex;
   flex-wrap: wrap;
   gap: .45rem 1.15rem;
   list-style: none;
-  margin: 0 0 1.75rem;
+  margin: 0;
   padding: 0;
   font-size: var(--fs-sm);
-  color: var(--ink-2);
+  color: var(--hero-muted);
 }
 .hero-facts li {
   display: inline-flex;
   align-items: center;
   gap: .5rem;
 }
-/* 用一个画出来的小方块替代原来的 emoji 图标 */
 .hero-facts li::before {
   content: "";
   flex: none;
   width: 6px; height: 6px;
   border-radius: 2px;
-  background: var(--accent);
+  background: var(--hero-mint);
 }
 .hero-facts li > span[aria-hidden="true"] { display: none; }
+
+/* 宽屏：CTA1 不必拉满整行，但依然明显大于 CTA2 */
+@media (min-width: 620px) {
+  .hero-actions {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .hero-actions .btn-primary {
+    width: auto;
+    flex: 0 1 auto;
+    min-width: 210px;
+    padding-inline: 1.9em;
+  }
+  .hero-actions .btn-ghost {
+    align-self: center;
+    flex: 0 0 auto;
+  }
+}
+
+/* 高风险边界：首屏只留短句 + 可展开细节 */
+.hero-boundary {
+  margin-top: 1.35rem;
+  font-size: var(--fs-sm);
+  line-height: 1.65;
+  color: var(--hero-muted);
+  border-top: 1px solid var(--hero-line);
+  padding-top: .9rem;
+  max-width: 62ch;
+}
+.hero-boundary strong { color: var(--hero-text); font-weight: 650; }
+.hero-boundary details { margin-top: .35rem; }
+.hero-boundary summary {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  min-height: var(--tap);
+  cursor: pointer;
+  color: var(--hero-mint);
+  font-weight: 600;
+  list-style: none;
+  border-radius: var(--radius-xs);
+}
+.hero-boundary summary::-webkit-details-marker { display: none; }
+.hero-boundary summary::after {
+  content: "";
+  width: 0; height: 0;
+  border-left: 5px solid currentColor;
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  transform: rotate(90deg);
+  transition: transform .18s ease;
+}
+.hero-boundary details[open] summary::after { transform: rotate(0deg); }
+.hero-boundary .boundary-detail {
+  margin: .35rem 0 0;
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  color: var(--hero-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-boundary summary::after { transition: none; }
+}
+
+/* --------------------------------------------------------------------------
+   4b. 首屏真实演示卡
+   DOM 由 index.html 提供，数据来自 EXAMPLES[0]，计算来自 core.mjs 的 projectAtShare。
+   类名与线上 DOM 严格一致（hero-demo-*），不是另一套命名。
+   -------------------------------------------------------------------------- */
+.hero-demo {
+  background: var(--hero-surface);
+  border: 1px solid var(--hero-line);
+  border-radius: var(--radius);
+  padding: clamp(1rem, 2.4vw, 1.3rem);
+  box-shadow: 0 20px 48px -28px rgba(0, 0, 0, .9);
+  color: var(--hero-text);
+  min-width: 0;
+}
+
+.hero-demo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .6rem;
+  flex-wrap: wrap;
+  margin-bottom: .55rem;
+}
+
+.hero-demo-kicker {
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  color: var(--hero-muted);
+}
+
+/* LIVE 徽章：薄荷底 + 深海军蓝字（11.78:1）。
+   反例：薄荷底 + 纸白字只有 1.42:1，绝不可用。 */
+.hero-demo-badge {
+  flex: none;
+  font-size: .66rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  line-height: 1.6;
+  padding: .1em .55em;
+  border-radius: var(--radius-pill);
+  color: #081827;
+  background: var(--hero-mint);
+  border: 1px solid var(--hero-mint);
+}
+/* 徽章不是唯一的状态信号：kicker 已经写了"真实示例 · 可拖动" */
+
+.hero-demo-title {
+  margin: 0 0 .95rem;
+  font-size: 1.0625rem;
+  font-weight: 650;
+  line-height: 1.5;
+  letter-spacing: -.005em;
+  color: var(--hero-text);
+  /* 示例标题可能较长，允许换行但限制行数，避免卡片被顶高 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.hero-demo-scores {
+  display: grid;
+  gap: .85rem;
+  margin-bottom: 1rem;
+}
+
+/*
+  单行结构：标签 + 数字 在第一行（两端对齐），进度条独占第二行。
+  标签允许换行（「去那家刚起步的小团队」11 个字，360px 下必须不溢出）。
+*/
+.hero-demo-score {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: .35rem .7rem;
+  min-width: 0;
+}
+
+.hero-demo-score-label {
+  font-size: var(--fs-sm);
+  font-weight: 650;
+  line-height: 1.45;
+  min-width: 0;
+  /* 长名字换行而不是溢出/省略号：这里必须读得出是哪个方案 */
+  overflow-wrap: anywhere;
+  color: var(--hero-muted);
+}
+/* A / B 用色块 + 明写方案名，颜色只是辅助，不是唯一线索 */
+.hero-demo-score[data-side="A"] .hero-demo-score-label { color: var(--hero-mint); }
+.hero-demo-score[data-side="B"] .hero-demo-score-label { color: var(--hero-amber); }
+.hero-demo-score[data-side="A"] .hero-demo-score-label::before,
+.hero-demo-score[data-side="B"] .hero-demo-score-label::before {
+  content: "";
+  display: inline-block;
+  width: 7px; height: 7px;
+  margin-right: .45em;
+  border-radius: 2px;
+  background: currentColor;
+  vertical-align: .06em;
+}
+
+.hero-demo-score-num {
+  flex: none;
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -.02em;
+  /* 拖动时数字每秒刷新，必须等宽，否则左右抖动 */
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  color: var(--hero-text);
+}
+.hero-demo-score[data-side="A"] .hero-demo-score-num { color: var(--hero-mint); }
+.hero-demo-score[data-side="B"] .hero-demo-score-num { color: var(--hero-amber); }
+
+/* 进度条槽：暗底 + 内描边，明确"可及范围"到哪里 */
+.hero-demo-bar {
+  grid-column: 1 / -1;
+  display: block;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(243, 248, 250, .10);
+  border: 1px solid rgba(243, 248, 250, .18);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .45);
+  overflow: hidden;
+}
+.hero-demo-bar > i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  /*
+    拖动滑杆时宽度每秒改几十次。过渡 width 会触发逐帧重排（layout thrash），
+    手机上手感发滞。这里只过渡 opacity：JS 直接写 width，条子与数字永远同步，
+    不会出现"数字已经变了、条子还在慢慢追"的不一致。宽度动画留给 transform 的场景。
+  */
+  transition: opacity .2s ease;
+}
+.hero-demo-score[data-side="A"] .hero-demo-bar > i { background: var(--hero-mint); }
+.hero-demo-score[data-side="B"] .hero-demo-bar > i { background: var(--hero-amber); }
+
+/* 滑杆区：label + output 同行，input 独占下一行 */
+.hero-demo-slider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: .15rem .7rem;
+  border-top: 1px solid var(--hero-line);
+  padding-top: .85rem;
+  margin-bottom: .75rem;
+}
+.hero-demo-slider label {
+  font-size: var(--fs-sm);
+  font-weight: 650;
+  line-height: 1.5;
+  color: var(--hero-text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.hero-demo-slider output {
+  flex: none;
+  font-size: .9rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--hero-mint);
+}
+.hero-demo-slider input[type="range"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: var(--hero-mint);
+  margin-top: .1rem;
+}
+.hero-demo-slider input[type="range"]::-webkit-slider-runnable-track {
+  background: rgba(243, 248, 250, .16);
+  border-color: transparent;
+}
+.hero-demo-slider input[type="range"]::-webkit-slider-thumb {
+  background: var(--hero-mint);
+  border-color: var(--hero-surface);
+}
+.hero-demo-slider input[type="range"]::-moz-range-track {
+  background: rgba(243, 248, 250, .16);
+  border-color: transparent;
+}
+.hero-demo-slider input[type="range"]::-moz-range-thumb {
+  background: var(--hero-mint);
+  border-color: var(--hero-surface);
+}
+
+/* 判定文案：默认跟随正文色，打平时换成琥珀色（临界时刻）+ 左边框提示 */
+.hero-demo-verdict {
+  margin: 0 0 .55rem;
+  font-size: var(--fs-sm);
+  font-weight: 650;
+  line-height: 1.6;
+  color: var(--hero-text);
+  min-height: 2.9em;
+  /* 文字变化时高度不跳：拖动时不抖动 */
+  display: block;
+}
+/* 打平 = 临界时刻：琥珀色 + 一枚「临界」小标记。
+   颜色之外必须有第二个线索（文字标记），否则色觉障碍用户看不出这是特殊状态。 */
+.hero-demo-verdict[data-state="tie"] {
+  color: var(--hero-amber);
+}
+.hero-demo-verdict[data-state="tie"]::before {
+  content: "临界";
+  display: inline-block;
+  margin-right: .5em;
+  padding: .05em .5em;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  vertical-align: .08em;
+  border-radius: var(--radius-xs);
+  border: 1px solid currentColor;
+  background: rgba(255, 184, 120, .14);
+}
+.hero-demo-verdict[data-state="lead"] {
+  color: var(--hero-text);
+}
+
+/* 免责小字：明显小于正文，压到辅助层 */
+.hero-demo-caveat {
+  margin: 0;
+  font-size: .72rem;
+  line-height: 1.65;
+  color: var(--hero-muted);
+  border-top: 1px solid var(--hero-line);
+  padding-top: .6rem;
+}
+.hero-demo-caveat strong { color: var(--hero-text); font-weight: 650; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-demo-bar > i { transition: none; }
+}
+
+/*
+  手机端：演示卡排在 CTA 之后（.hero-demo { order: 2 } 已在第 4 节设置）。
+  这里额外收紧间距，确保首屏不会因为演示卡变得过长。
+*/
+@media (max-width: 959px) {
+  .hero-demo { margin-top: .25rem; }
+  .hero-demo-score-num { font-size: 1.3rem; }
+}
+
+/* 高对比模式：整卡交还白底黑字，颜色只留作标记 */
+@media (prefers-contrast: more) {
+  .hero-demo {
+    background: #ffffff;
+    border: 2px solid #2b3441;
+    box-shadow: none;
+  }
+  .hero-demo-kicker,
+  .hero-demo-score-label,
+  .hero-demo-caveat,
+  .hero-demo-verdict { color: #1a2530; }
+  .hero-demo-title { color: #000000; }
+  .hero-demo-badge {
+    color: #ffffff;
+    background: #000000;
+    border: 2px solid #000000;
+  }
+  .hero-demo-score[data-side="A"] .hero-demo-score-num { color: #00513f; }
+  .hero-demo-score[data-side="B"] .hero-demo-score-num { color: #6d2f0c; }
+  .hero-demo-score[data-side="A"] .hero-demo-score-label { color: #00513f; }
+  .hero-demo-score[data-side="B"] .hero-demo-score-label { color: #6d2f0c; }
+  .hero-demo-bar {
+    background: #ffffff;
+    border: 1px solid #2b3441;
+    box-shadow: none;
+  }
+  .hero-demo-verdict[data-state="tie"] {
+    color: #6d2f0c;
+  }
+  .hero-demo-verdict[data-state="tie"]::before {
+    color: #6d2f0c;
+    border: 2px solid currentColor;
+    background: #ffffff;
+  }
+  .hero-demo-slider output { color: #00513f; }
+}
+
+/* 强制颜色：系统接管颜色，形状与文字标签仍能区分 */
+@media (forced-colors: active) {
+  .hero-demo {
+    background: Canvas;
+    border: 1px solid CanvasText;
+    box-shadow: none;
+  }
+  .hero-demo-kicker,
+  .hero-demo-score-label,
+  .hero-demo-caveat,
+  .hero-demo-verdict,
+  .hero-demo-title,
+  .hero-demo-score-num,
+  .hero-demo-slider output {
+    color: CanvasText;
+    forced-color-adjust: none;
+  }
+  .hero-demo-badge {
+    color: HighlightText;
+    background: Highlight;
+    border: 1px solid CanvasText;
+    forced-color-adjust: none;
+  }
+  .hero-demo-bar {
+    background: Canvas;
+    border: 1px solid CanvasText;
+    box-shadow: none;
+  }
+  .hero-demo-bar > i { background: Highlight; forced-color-adjust: none; }
+  .hero-demo-verdict[data-state="tie"]::before {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+    forced-color-adjust: none;
+  }
+}
 
 /* --------------------------------------------------------------------------
    5. 按钮与提示
@@ -1693,6 +2237,54 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
     outline-offset: 3px;
   }
   .example-card:hover { transform: none; }
+
+  /* ── 首屏品牌带在高对比下的处理 ──
+     品牌色在这个偏好下必须让位给"能看清"。整段改成纸白 + 黑字，
+     薄荷/琥珀只保留作 A/B 的识别标记（且同时有文字标签，不靠颜色）。 */
+  .hero {
+    --hero-bg: #ffffff;
+    --hero-surface: #ffffff;
+    --hero-text: #000000;
+    --hero-muted: #1a2530;
+    --hero-mint: #00513f;
+    --hero-amber: #6d2f0c;
+    --hero-line: #2b3441;
+    background: #ffffff;
+    color: #000000;
+  }
+  .hero::before { display: none; }
+  .hero .lede,
+  .hero .eyebrow,
+  .hero-facts,
+  .hero-boundary,
+  .hero-boundary .boundary-detail { color: #1a2530; }
+  .hero h1 { color: #000000; }
+  .hero em { color: #00513f; text-decoration-color: currentColor; }
+  .demo-card {
+    background: #ffffff;
+    border: 2px solid #2b3441;
+    box-shadow: none;
+  }
+  .demo-head h2, .demo-head h3 { color: #00513f; }
+  .demo-tag { color: #1a2530; border-color: #2b3441; }
+  .demo-flag, .demo-slider-block output { border-width: 2px; border-color: currentColor; }
+  .demo-bar { border: 1px solid #2b3441; background: #ffffff; }
+  .demo-insight .demo-flag[data-state="infeasible"] { border-style: dashed; }
+  .hero-actions .btn-primary {
+    background: #000000;
+    border-color: #000000;
+    color: #ffffff;
+  }
+  .hero-actions .btn-primary:hover { background: #000000; color: #ffffff; }
+  .hero-actions .btn-ghost {
+    border: 2px solid #2b3441;
+    background: #ffffff;
+    color: #000000;
+    text-decoration: none;
+  }
+  .hero :where(a, button, input, summary, [tabindex]):focus-visible {
+    outline-color: #0043a8;
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -1751,6 +2343,40 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
   }
   .example-card .ex-tag,
   .privacy-block { border: 1px solid CanvasText; }
+
+  /* 首屏：交给系统色，不硬撑品牌海军蓝 */
+  .hero {
+    background: Canvas;
+    color: CanvasText;
+    border-bottom: 1px solid CanvasText;
+  }
+  .hero::before { display: none; }
+  .hero h1, .hero .lede, .hero .eyebrow,
+  .hero-facts, .hero-boundary, .hero-boundary .boundary-detail,
+  .demo-head h2, .demo-head h3, .demo-question, .demo-insight {
+    color: CanvasText;
+    forced-color-adjust: none;
+  }
+  .demo-card { background: Canvas; border: 1px solid CanvasText; box-shadow: none; }
+  .demo-tag, .demo-flag { border: 1px solid CanvasText; color: CanvasText; background: Canvas; }
+  .demo-insight .demo-flag[data-state="infeasible"] { border-style: dashed; }
+  .demo-score-row[data-side="A"] .demo-score-name,
+  .demo-score-row[data-side="B"] .demo-score-name,
+  .demo-score-row[data-side="A"] .demo-score-num,
+  .demo-score-row[data-side="B"] .demo-score-num,
+  .demo-slider-block output {
+    color: CanvasText;
+    forced-color-adjust: none;
+  }
+  .demo-bar { border: 1px solid CanvasText; background: Canvas; }
+  .demo-bar > i { background: Highlight; forced-color-adjust: none; }
+  .hero-actions .btn-primary {
+    background: Highlight;
+    border: 1px solid CanvasText;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+  .hero-actions .btn-ghost { border: 1px solid CanvasText; background: Canvas; color: CanvasText; }
 }
 
 /* --------------------------------------------------------------------------
@@ -1785,10 +2411,22 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
   .site-header, .hero-actions, .hero-facts, .toolbar, .example-grid,
   .skip-link, .modal, .storage-note, .card-actions, .icon-btn,
   .stepper button, .flip-slider-block, .footer-links, .notice-warn::before,
-  .header-nav { display: none !important; }
+  .header-nav,
+  /* 首屏演示卡是交互组件，纸上无意义；打印时连同品牌带一起还原成白底 */
+  .hero-demo, .hero::before, .hero-boundary details { display: none !important; }
 
   .wrap { max-width: none; padding-inline: 0; }
-  .hero { padding-block: 0 6pt; border-bottom: 0; }
+  .hero {
+    background: #fff !important;
+    color: #000 !important;
+    padding-block: 0 6pt;
+    border-bottom: 0;
+  }
+  .hero h1, .hero .lede, .hero .eyebrow, .hero-facts,
+  .hero-boundary, .hero-boundary .boundary-detail { color: #000 !important; }
+  .hero em { color: #000 !important; text-decoration-color: #000 !important; }
+  .hero-boundary { border-top: 1px solid #999; }
+  .hero-grid { display: block; }
   .section { padding-block: 10pt; border-top: 1px solid #b8b8b8; page-break-inside: auto; }
 
   .card, .notice, .privacy-block, .hypothesis-q {

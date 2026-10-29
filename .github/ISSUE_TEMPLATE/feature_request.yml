@@ -1,0 +1,65 @@
+name: 功能建议
+description: 提议让产品更好用。请先描述具体困难，而不是直接给技术方案。
+title: '[Feature] '
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        这个产品**刻意做得很窄**：它只帮你看清"哪个判断一变结论就翻"，不给推荐、不预测、不算概率。
+
+        因此以下类型的建议通常**不会被采纳**，提交前请先看一眼：
+        - 加入"成功率 / 胜率 / 准确率 / 预测置信度"
+        - 加入 AI 自动生成因素、自动推荐答案
+        - 加入登录、云同步、决策历史、行为分析
+        - 加入后端、数据库、任何第三方请求
+
+        原因见 [PRD 的「坚决不做」清单](https://github.com/tbj0623/decision-arena-lab/blob/main/docs/product/PRD.md)。
+
+  - type: textarea
+    id: pain
+    attributes:
+      label: 你遇到的具体困难是什么？
+      description: 请描述真实的使用场景（用虚构或去标识化的例子），以及你在哪一步卡住了。
+      placeholder: 例如：我想比较"三年后回看"这个因素，但不知道该怎么给它打分——是打现在的感受，还是打三年后的预期？
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 你希望改成什么样？
+      description: 描述你期望看到的行为即可，不必给出实现方案。
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 这个改动大概影响多大？
+      options:
+        - 只改文案 / 提示语
+        - 改界面布局或交互
+        - 新增一个功能
+        - 改动计算方式（会影响历史结果的可比性）
+        - 不确定
+    validations:
+      required: true
+
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: 隐私与误导风险（可选，但很有帮助）
+      description: 你认为这个建议会不会引入外部请求、存储用户数据，或让人误以为存在客观概率？
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: ack
+    attributes:
+      label: 确认
+      options:
+        - label: 我已阅读「坚决不做」清单，本建议不在其中
+          required: true
+        - label: 本建议基于具体使用困难，而非"我觉得用户会喜欢"
+          required: false

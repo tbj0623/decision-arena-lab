@@ -306,23 +306,35 @@ node --test          # 够了，别上全套门禁
 要发布 / 要 push 到公开仓库  → gate.mjs
 
 # 最常用的三条命令
+mkdir -p ops                                    # ← 先建目录，后两条都依赖它
 node FACTORY_KIT/tools/taskcard.mjs --list
 node FACTORY_KIT/tools/checkpoint.mjs verify --all ops/
 node FACTORY_KIT/tools/gate.mjs --project . --out ops/gate-report.md
 ```
 
+> ⚠️ 那个 `mkdir -p ops` 不是凑数：`checkpoint verify --all` 在 `ops/` 不存在时会报
+> 「目录不存在」，`gate --out ops/...` 会抛 `ENOENT`。**这是实测踩出来的**，
+> 少这一行，三条命令里有两条跑不通。
+
 ---
 
 ## 已知问题（使用前务必知道）
 
-| 问题 | 影响 | 绕法 |
-|---|---|---|
-| `taskcard --out` 不建父目录 | 按官方示例会 `ENOENT` | 先 `mkdir -p` 目标目录 |
-| `gate` 的 `release-freshness` 门**永远显示绿** | 有 `dist/*.zip` 时也不真的检查新鲜度 | **别依赖这道门**，手工比对 mtime |
-| `license` 门要求 > 100 字节 | 简短 LICENSE 会被误报"找不到" | 用完整版许可证文本 |
-| `checkpoint verify --all` 不带目录 | 报 `目录不存在：true` | 总是显式传目录 |
+> 状态截至 2026-10-29 22:25，均已逐条实测（见 `SELFTEST.md`）。
 
-> 完整的问题清单（含复现命令、代码位置、严重级别）见 [`SELFTEST.md`](./SELFTEST.md)。
+| 问题 | 状态 | 影响 / 绕法 |
+|---|---|---|
+| `gate --out` 不建父目录 | ⚠️ **待修** | `ops/` 不存在时抛 `ENOENT`。先 `mkdir -p ops` |
+| `taskcard.mjs` 被 import 会杀宿主进程 | ⚠️ **待修** | 想当库用会 `process.exit(2)`。只能用 CLI |
+| `license` 门空文件报"找不到" | ⚠️ 轻微 | 空与不存在报同一句话。看文件到底在不在即可 |
+| ~~`taskcard --out` 不建父目录~~ | ✅ 已修 | 现在会自动 `mkdir -p`（多层也行） |
+| ~~`release-freshness` 门永远显示绿~~ | ✅ 已修 | 现在真比对 mtime，过期会报「过期：xxx.zip」 |
+| ~~`license` 门要求 > 100 字节~~ | ✅ 已修 | 现在只要求非空（38 字节的短许可证也能过） |
+| ~~`checkpoint verify --all` 报「目录不存在：true」~~ | ✅ 已修 | 不带目录时正确回退到默认 `ops` |
+| ~~未知角色抛堆栈 + 泄漏本机路径~~ | ✅ 已修 | 现在友好提示 + `exit 2`，无堆栈 |
+| ~~`gate.mjs` 被 import 会跑全门禁~~ | ✅ 已修 | 现在 import 仅 7ms，不执行任何门 |
+
+> 完整的问题清单（含复现命令、代码位置、严重级别、修复前后对照）见 [`SELFTEST.md`](./SELFTEST.md)。
 
 ---
 

@@ -5,7 +5,7 @@
  * 约束（改这个文件时必须守住）
  *  - 不说"概率 / 胜率 / 预测"，不给结论式推荐，不编任何统计数字。
  *  - 示例全部虚构：不出现真实品牌、真实公司、真人姓名。
- *  - 示例数值与 work/product/USER_JOURNEYS.md 的 J1–J4 完全一致（J5 见 FINDINGS 说明）。
+ *  - 示例数值与 docs/product/USER_JOURNEYS.md 的 J1–J4 完全一致（J5 见 FINDINGS 说明）。
  *  - 文案必须能处理三种 direction（increase / decrease / hold）和 flip === null。
  */
 

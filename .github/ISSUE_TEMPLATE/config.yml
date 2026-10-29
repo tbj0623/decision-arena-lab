@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 在线使用 / Online demo
+    url: https://tbj0623.github.io/decision-arena-lab/
+    about: 先试试看，确认问题是否可复现。
+  - name: 隐私说明 / Privacy
+    url: https://github.com/tbj0623/decision-arena-lab/blob/main/docs/PRIVACY.md
+    about: 了解数据如何留在你的浏览器里。

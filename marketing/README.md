@@ -127,14 +127,14 @@ node marketing/check-redlines.mjs
 
 ### 人工复核清单（脚本查不出的部分）
 
-- [x] 所有数值都来自 `site/core.mjs` 实算（`node --test` 实测 **107 pass / 0 fail / 0 todo**；`node work/product/verify-journeys.mjs` 5 条 PASS）
+- [x] 所有数值都来自 `site/core.mjs` 实算（`node --test` 实测 **176 pass / 0 fail / 0 todo**；`node docs/product/verify-journeys.mjs` 5 条 PASS）
 - [x] 无真实品牌名、公司名、真人名（示例场景来自 `site/features/narrative.mjs`，文件头注明"虚构"）
 - [x] 无编造的访问量、用户数、star 数、好评、评测引用（`feedback_plan.md` 明确写当前全部为 0）
 - [x] 无任何暗示专业建议的表述
 - [x] 每个 `.md` 首行均为 `<!-- STATUS: DRAFT — NOT POSTED -->`
 - [x] 三份对外文案里的地址均为真实 URL（站点地址占位符已全部替换）；剩余 4 处二维码占位均在"待生成"上下文中
 
-> ⚠️ **测试条数在本次夜里变了三次**（62 → 86 → 91 → 94 → 107）。这就是为什么素材里不该写死条数：`developer_zh.md` 里的具体数字已全部删掉，改成"跑 `node --test` 全部通过"。本 README 保留 107 是因为它需要记录本机实测快照，**对外文案不要照抄**。
+> ⚠️ **测试条数今晚至少变了 6 次**（62 → 86 → 91 → 94 → 107 → **176**）。这就是为什么素材里不该写死条数：`developer_zh.md` 里的具体数字已全部删掉，改成"跑 `node --test` 全部通过"。本 README 保留 176 只是记录某一刻的快照，**对外文案永远不要照抄**。
 
 ---
 
@@ -144,7 +144,7 @@ node marketing/check-redlines.mjs
 
 ```bash
 node --test                              # 全部单测（条数随提交变化，别写死）
-node work/product/verify-journeys.mjs    # PASS：5 条旅程与 core.mjs 一致
+node docs/product/verify-journeys.mjs    # PASS：5 条旅程与 core.mjs 一致
 ```
 
 主要引用（示例 `offer`「接不接这家小团队的 offer」，`site/features/narrative.mjs` 第一条）：
@@ -158,7 +158,9 @@ node work/product/verify-journeys.mjs    # PASS：5 条旅程与 core.mjs 一致
 
 翻转阈值（权重 7 状态下）：收入确定性占比 41.2% → **39.39%**（界面精确值 39.3939%）时打平，再往下翻转。
 
-> ⚠️ 注意精度：界面 `flipDescription()` 标题那一行显示的是 **39.39%（精确 39.3939%）**，而阈值列表行显示 **39.4%**。同一页面两处精度不同，这是 `site/app.mjs:641-666` 的现状。引用"界面原文"时必须用 39.39%，否则录屏时会被抓错。
+> ✅ 精度已统一（v1.1.3）：`flipDescription()` 标题行与阈值列表行**都显示 2 位小数 39.39%**（列表行 `pct(...,2)`，`site/app.mjs:734`；标题行 `:709-714`）。我上轮报的"同一页面两种精度"是真 bug，已被修好——所以现在**任何说"有两种精度"的素材都过时了**。
+>
+> 另：阈值滑杆是 **`step="any"`**，配合**「跳到精确临界点」按钮**可以真的停在 39.3939% 并显示"两边打平（差 0.0）"。拍"打平"必须用这个按钮，手拖 39%/40% 两档都只会显示"更倾向"某一边。
 贡献拆解（默认状态）：+14.3 / −11.5 / 0.0 / +4.3 = +7.1。
 假设卡：**默认状态指向「成长速度」**（A 9 vs B 5，高 4 分，|贡献| 14.3 最大）；**w=7 状态指向「收入确定性」**（A 4 vs B 8，低 4 分，|贡献| 16.5 最大）。视频与截图脚本里的 w=7 镜头必须用后者。
 

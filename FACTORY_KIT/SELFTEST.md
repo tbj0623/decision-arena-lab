@@ -1,29 +1,48 @@
 # SELFTEST — FACTORY_KIT 工具箱端到端自测
 
-> 执行时间：2026-10-29 21:20 – 21:35（Asia/Shanghai）
-> 执行者：release-engineer（W04-01）
+> 初版：2026-10-29 21:20–21:35 · release-engineer（W04-01）
+> **复测：2026-10-29 22:20–22:30 · W07-01（6 个问题的修复状态逐条实测）**
 > 方法：**假装第一次接触这套工具的陌生人**，在一个空白临时项目里从零走一遍
-> 临时目录：`%TEMP%\fk-selftest-*`（已清理，109 项）
+> 临时目录：`%TEMP%\fk-selftest-*`、`%TEMP%\w7-*`（均已清理）
 > 原则：**只记录，不改工具**（除 typo 外，任何 bug 都不在本次修复）
 
 ---
 
 ## 零、结论速览
 
-| 维度 | 结果 |
-|---|---|
-| 端到端自测 | **7 步**，全部走通（含 2 处需绕行的坑） |
-| 发现的问题 | **6 个**，其中 **1 个严重（假通过）**、3 个中等、2 个轻微 |
-| 故障注入 | **6 / 6 正确失败** ✅ |
-| 三个工具是否都有故意失败测试 | ✅ 都有（taskcard 靠未知角色、checkpoint 3 个、gate 3 个） |
-| 是否修改工具行为 | ❌ 未修改任何工具（遵守红线） |
+> **⚠️ 本节为复测后的最新状态（2026-10-29 22:30）。原始记录保留在下方各节，未删改。**
 
-**最严重的问题**：`gate.mjs` 的 `release-freshness` 门用了 ESM 里不存在的 `require()`，
-异常又被 `catch {}` 静默吞掉，**导致该门对任何带 zip 的项目永远显示绿色，实际从未检查过** —— 正是这个工具声称要消灭的"假通过"。
+| 维度 | 初测（21:35） | 复测（22:30） |
+|---|---|---|
+| 端到端自测 | 7 步，全部走通（含 2 处需绕行的坑） | 7 步，绕行项已减少 |
+| 发现的问题 | **6 个** | **4 个 FIXED / 2 个 PARTIALLY FIXED / 0 个 STILL BROKEN** |
+| 复测新发现 | — | **2 个新问题**（`gate --out` 同类 bug、`taskcard` 缺 import 保护） |
+| 故障注入 | 6 / 6 正确失败 ✅ | 仍 6 / 6 ✅ |
+| 是否修改工具行为 | ❌ 未修改（遵守红线） | ❌ 未修改（仅复测） |
+
+### 6 个问题的修复状态一览
+
+| # | 问题 | 初测严重度 | 复测判定 |
+|---|---|---|---|
+| 1 | `release-freshness` 假通过（ESM 里 `require`） | 🔴 P0 | **✅ FIXED** |
+| 2 | `--out` 不建父目录（taskcard） | 🟡 P1 | **✅ FIXED** |
+| 3 | `license` 门把 <100 字节误报「找不到」 | 🟡 P1 | **⚠️ PARTIALLY FIXED** |
+| 4 | 未知角色抛堆栈且泄漏本机路径 | 🟡 P1 | **✅ FIXED** |
+| 5 | `verify --all` 报「目录不存在：true」 | 🟢 P2 | **✅ FIXED** |
+| 6 | `gate.mjs` 缺 isMainModule | 🟢 P2 | **⚠️ PARTIALLY FIXED** |
+
+> 第 3、6 条判 PARTIALLY 的具体理由见 §四「复测明细」——
+> 都是"主问题修好了，但留下了同类行为不一致的尾巴"：
+> #3 修了阈值没改文案；#6 修了 gate.mjs，taskcard.mjs 同类问题仍在。
+
+**最严重的问题（初测）**：`gate.mjs` 的 `release-freshness` 门用了 ESM 里不存在的 `require()`，
+异常又被 `catch {}` 静默吞掉，**导致该门对任何带 zip 的项目永远显示绿色，实际从未检查过** —— 正是这个工具声称要消灭的"假通过"。**现已 FIXED。**
 
 ---
 
 ## 一、端到端自测（7 步，真实输出）
+
+> 本节为 **W04-01 初测的原始记录**，保留不动，作为"修复前行为"的对照基线。
 
 ### 环境
 
@@ -685,3 +704,445 @@ rm -rf "$S"
 | 临时目录未清理 | ✅ 109 项已删，`%TEMP%\fk-selftest-*` 无残留 |
 | 动了 site/ tests/ scripts/ | ✅ 未触碰（本任务写入区仅 `FACTORY_KIT/`） |
 | 自测产物含内部路径 | ✅ 本文件只出现 `C:\Users\<用户名>` 作为**待脱敏样本**，不含真实凭据；临时目录名已泛化 |
+
+---
+
+# 四、复测明细（W07-01，2026-10-29 22:20–22:30）
+
+> Lead 于 22:02 前修完 6 个问题。本节**逐条真跑复测**，给出修复前后对照。
+> 复测环境：`%TEMP%\w7-967937390\p`（已清理），一个自建的 8 文件最小项目 + git 仓库。
+
+## 4.0 复测方法
+
+为了排除"修了个寂寞"和"修成永远红"两种失败，每条都做 **至少两个方向**：
+
+| 方向 | 目的 |
+|---|---|
+| 复现原故障 | 确认修复前会失败的那个场景，现在不再失败 |
+| 正向对照 | 确认修复没有把它变成"永远失败" |
+| 边界检查 | 确认"该失败的仍然失败"（防止修过头） |
+
+---
+
+## 4.1 【问题 1】`release-freshness` 假通过 → **✅ FIXED**
+
+### 修复前（W04-01 记录）
+
+```text
+$ ls dist/
+demo.zip    (10 字节，确实存在)
+
+$ node gate.mjs --project . --only release-freshness
+✅ 发行包比源码新     dist/ 无 zip，跳过      ← 撒谎
+```
+
+根因：`readdirSafe()` 里用 `require('node:fs')`，ESM 中抛 `ReferenceError`，
+被 `catch { /* ignore */ }` 吞掉 → `zips` 恒为 `[]` → 永远走 `pass:true`。
+
+### 修复后实测
+
+**测试 1：过期包（Lead 特别要求的场景）**
+
+```text
+$ # 造 dist/old.zip，mtime 设为 3 小时前
+$ dist/old.zip mtime = 19:20:52
+$ site/app.mjs mtime = 22:20:51
+
+$ node gate.mjs --project . --only release-freshness
+⚠️ 发行包比源码新                        过期：old.zip
+
+所有阻断门通过 ✓
+[exit=0]
+```
+
+✅ **正确报「过期：old.zip」**，不再是「无 zip，跳过」。（`⚠️` 是因为该门 `blocking: false`，属提醒级，符合设计。）
+
+**测试 2：正向对照（zip 比源码新）**
+
+```text
+$ zip mtime = 23:21:17
+✅ 发行包比源码新                        1 个 zip 均比源码新
+```
+
+✅ 没有变成"永远红"。
+
+**测试 3：负向对照（dist/ 不存在）**
+
+```text
+✅ 发行包比源码新                        无 dist/，跳过
+```
+
+✅ 正常的"确实没有"仍然跳过。
+
+**测试 4：边界（dist/ 存在但为空）**
+
+```text
+✅ 发行包比源码新                        dist/ 存在但无 zip，跳过
+```
+
+✅ 文案区分了「无 dist/」和「dist/ 存在但无 zip」，比修复前更准确。
+
+### 代码核对
+
+```js
+// gate.mjs:250-256（修复后）
+let zips;
+try {
+  zips = readdirSync(distDir).filter((f) => f.endsWith('.zip'));
+} catch (e) {
+  return { pass: false, detail: `无法读取 dist/：${String(e.message).slice(0, 100)}` };
+}
+if (!zips.length) return { pass: true, detail: 'dist/ 存在但无 zip，跳过' };
+```
+
+✅ 用了顶部已 import 的 `readdirSync`；`catch` 返回 `pass:false` 而非静默忽略；
+`require(` 在全文件中已 0 处（仅剩注释里提到历史缺陷）。
+
+**判定：✅ FIXED**（4 个方向全部符合预期）
+
+---
+
+## 4.2 【问题 2】`--out` 不建父目录 → **✅ FIXED**
+
+### 修复前
+
+```text
+$ node taskcard.mjs --role qa-engineer --task W01-07 --title "重跑全部测试" \
+     --detail "跑 node --test" --out ops/qa/task.md
+Error: ENOENT: no such file or directory, open '...\ops\qa\task.md'
+    at writeFileSync (...taskcard.mjs:283:3)
+[exit=1]
+```
+
+### 修复后实测
+
+**测试 1：复现原命令（父目录不存在）**
+
+```text
+$ node taskcard.mjs --role qa-engineer --task W01-07 --title "重跑全部测试" \
+     --detail "跑 node --test" --out ops/qa/task.md
+已写入：ops/qa/task.md
+[exit=0]
+
+  文件是否生成: True
+  大小: 1384 B
+```
+
+✅ 完全按 QUIKSTART / 帮助里的原示例写法，成功。
+
+**测试 2：深层多级目录**
+
+```text
+$ node taskcard.mjs --role red-team --task X --title "深层" --out a/b/c/d/card.md
+已写入：a/b/c/d/card.md
+[exit=0]  exists=True
+```
+
+✅ 递归创建 4 层目录，`mkdirSync(dirname(out), { recursive: true })` 生效。
+
+### 代码核对
+
+```js
+// taskcard.mjs:291
+mkdirSync(dirname(out), { recursive: true });
+```
+
+**判定：✅ FIXED**
+
+---
+
+## 4.3 【问题 3】`license` 门把 <100 字节误报「找不到」 → **⚠️ PARTIALLY FIXED**
+
+### 修复前
+
+```text
+$ # LICENSE 存在，38 字节
+$ node gate.mjs --project . --only license
+❌ 许可证存在    找不到 LICENSE 文件      ← 文件明明在
+[exit=1]
+```
+
+### 修复后实测
+
+**测试 1：38 字节的短 LICENSE（原来的误报场景）**
+
+```text
+$ LICENSE 大小: 38 字节
+✅ 许可证存在                          LICENSE（38 字节）
+```
+
+✅ **主问题已修**：不再因为"太短"而误报"找不到"。
+
+**测试 2：0 字节空文件（应该红）**
+
+```text
+$ 大小: 0 字节
+❌ 许可证存在                          找不到 LICENSE 文件
+```
+
+✅ 确实变红了（正确拦截空文件）。
+
+**测试 3：完全没有 LICENSE（应该红）**
+
+```text
+❌ 许可证存在                          找不到 LICENSE 文件
+```
+
+✅ 正确。
+
+### 为什么判 PARTIALLY 而不是 FIXED
+
+代码从 `size > 100` 改成了 `size > 0`：
+
+```js
+// gate.mjs:203
+if (existsSync(p) && statSync(p).size > 0) {
+  return { pass: true, detail: `${n}（${statSync(p).size} 字节）` };
+}
+...
+return { pass: false, detail: '找不到 LICENSE 文件' };
+```
+
+**核心缺陷已消除**（38 字节能过了）。但遗留一个**文案问题**：
+"文件为空"和"文件不存在"仍然返回**完全相同**的 `detail`（都是"找不到 LICENSE 文件"）。
+
+测试 2 里那个 0 字节的 LICENSE 文件**是存在的**，报"找不到"依然是误导。
+这恰好是我初测时提的原话——问题不只是阈值，还有"报错信息与实际原因不符"。
+阈值改了，但报错文案没区分。
+
+**严重度**：低（功能判定正确，只是文案）。**不影响使用**，所以不阻塞。
+
+**判定：⚠️ PARTIALLY FIXED**（功能已修 / 文案未区分"空"与"不存在"）
+
+---
+
+## 4.4 【问题 4】未知角色抛堆栈且泄漏本机路径 → **✅ FIXED**
+
+### 修复前
+
+```text
+$ node taskcard.mjs --role nobody
+file:///C:/Users/<用户名>/Desktop/.../taskcard.mjs:166
+  if (!r) throw new Error(`未知角色：${nobody}。可用：...`);
+                ^
+Error: 未知角色：nobody。可用：market-scout, ...
+    at ModuleJob.run (...)
+```
+
+问题：① 未捕获异常 + 完整堆栈；② 堆栈里带本机绝对路径；③ 退出码不符合 exit 2 约定。
+
+### 修复后实测
+
+```text
+$ node taskcard.mjs --role nobody
+未知角色：nobody
+可用角色：market-scout, product-owner, ux-writer, logic-engineer, ui-engineer,
+story-engineer, qa-engineer, red-team, growth-producer, release-engineer, lead
+[exit=2]
+```
+
+✅ 三个问题全部消除：
+- 无堆栈（只有两行友好提示）
+- **无本机路径**（不再出现 `file:///C:/Users/...`）
+- 退出码是约定的 `2`
+
+**判定：✅ FIXED**
+
+---
+
+## 4.5 【问题 5】`verify --all` 报「目录不存在：true」 → **✅ FIXED**
+
+### 修复前
+
+```text
+$ node checkpoint.mjs verify --all
+目录不存在：true
+[exit=2]
+```
+
+根因：`parseArgs` 把"参数缺省"编码成字符串 `'true'`，
+而 `typeof args.all === 'string'` 恒真，于是 `dir` 变成 `'true'`。
+
+### 修复后实测
+
+**测试 1：不带目录（原故障场景）**
+
+```text
+$ node checkpoint.mjs verify --all
+✓ CHECKPOINT.md
+
+全部通过 ✓
+[exit=0]
+```
+
+✅ `ops/` 下确实有一个刚创建的 `CHECKPOINT.md`，被正确找到并校验通过。
+不再报「目录不存在：true」，而是正确回退到默认目录 `ops`。
+
+**测试 2：显式传目录（正向对照）**
+
+```text
+$ node checkpoint.mjs verify --all ops/
+✓ CHECKPOINT.md
+
+全部通过 ✓
+[exit=0]
+```
+
+✅ 显式传参仍然工作，没被改坏。
+
+**判定：✅ FIXED**
+
+---
+
+## 4.6 【问题 6】`gate.mjs` 缺 isMainModule → **⚠️ PARTIALLY FIXED**
+
+### 修复前
+
+`gate.mjs` 全文没有 `isMainModule` 保护。任何 `import` 它的代码，
+一 import 就会立即执行全部门禁（跑 `node --test`、扫 git 历史），并可能 `process.exit(1)` 杀掉宿主进程。
+
+### 修复后实测
+
+**测试 1：确认 gate.mjs 有保护**
+
+```text
+  L357: import { fileURLToPath } from 'node:url';
+  L358: import { realpathSync } from 'node:fs';
+  L360: function isMainModule() {
+  L363:   return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  L369: if (isMainModule()) {
+```
+
+**测试 2：真 import 一次，计时**
+
+```text
+$ node -e "await import('file:///.../gate.mjs')"
+  import 耗时: 7ms
+  GATES 数量: 8
+  runGates 是函数: true
+  进程存活（未被 process.exit 杀死）: true
+[exit=0]
+```
+
+✅ **主问题已修**：7ms 完成 import，门禁一条没跑，宿主进程活着，
+且 `GATES` / `runGates` 可正常导出使用（真正可当库用了）。
+
+**测试 3：对照 checkpoint.mjs**
+
+```text
+  L332: function isMainModule() {
+  L341: if (isMainModule()) {
+```
+
+✅ 两者都有保护。
+
+**测试 4：对照 taskcard.mjs —— 发现漏网**
+
+```text
+$ 检查 taskcard.mjs 的 isMainModule
+  isMainModule 出现次数: 0  ← 仍缺
+```
+
+实际 import 一次：
+
+```text
+$ node -e "console.log('宿主: import 之前'); await import('.../taskcard.mjs'); console.log('宿主: import 之后')"
+  宿主: import 之前
+taskcard.mjs — 生成 Agent 任务卡
+
+用法：
+  node taskcard.mjs --list
+  ...
+
+为什么要有这个工具：
+  含糊的任务描述 → Agent 自由发挥 → 交付物对不上
+  ...
+[exit=2]
+```
+
+**宿主进程被 `process.exit(2)` 直接杀死**——「宿主: import 之后」这行永远没打印出来。
+
+### 为什么判 PARTIALLY 而不是 FIXED
+
+Lead 的修法说明写的是「已加，import 耗时 10ms 不再跑全门禁」，**针对 gate.mjs 完全属实**（实测 7ms）。
+
+但同一个问题在 **`taskcard.mjs` 上也存在**，而它没有被修：
+`taskcard.mjs` 的 CLI 代码在模块顶层直接执行，`--list` / 无参数分支都调用 `process.exit()`。
+任何 `import` 它的代码会立刻打印用法并被 `exit(2)` 杀掉。
+
+**这不是 Lead 修错了，是修复范围只覆盖了报告里点名的那一个文件。**
+初测报告的问题 #6 原文写的是「`gate.mjs` 没有 main-module 保护」——Lead 修的就是它，没毛病。
+是我初测时**只点名了 gate.mjs，漏看了 taskcard.mjs**。这条算我的漏报。
+
+**严重度**：低（当前三个工具都只用 CLI 调用，没人 import taskcard）。
+但如果以后想把 `buildTaskCard()` 当库用（很自然的用法），会踩坑。
+
+**判定：⚠️ PARTIALLY FIXED**（gate.mjs 已修且实测通过 / taskcard.mjs 同类问题仍在）
+
+---
+
+## 4.7 复测新发现的问题
+
+### 🆕 N-1：`gate.mjs --out` 也不建父目录（与问题 2 同类）
+
+`taskcard.mjs` 的 `--out` 修好了，但 `gate.mjs` 的 `--out` **还是老样子**：
+
+```text
+$ cd <全新空目录>
+$ node gate.mjs --project . --out ops/gate-report.md
+node:fs:2483
+    return binding.writeFileUtf8(
+                   ^
+Error: ENOENT: no such file or directory, open '...\ops\gate-report.md'
+    at writeFileSync (...gate.mjs:374:5)
+[exit=1]
+```
+
+**这直接影响 QUICKSTART**——「一分钟速查」里第三条命令就是
+`gate --project . --out ops/gate-report.md`，在全新环境（没有 `ops/`）里必失败。
+
+**已处理**：在 QUICKSTART 的速查块加了 `mkdir -p ops`，并说明原因（见任务 C）。
+**未修工具**（遵守红线，且这属于 Lead 的决策范围）。
+
+### 🆕 N-2：`taskcard.mjs` 缺 isMainModule（见 4.6 测试 4）
+
+同上。
+
+---
+
+## 4.8 复测汇总
+
+| # | 问题 | 判定 | 关键证据 |
+|---|---|---|---|
+| 1 | `release-freshness` 假通过 | **✅ FIXED** | 过期包报「过期：old.zip」；4 个方向全对 |
+| 2 | `--out` 不建父目录（taskcard） | **✅ FIXED** | 原命令成功；4 层目录递归创建 |
+| 3 | `license` <100 字节误报 | **⚠️ PARTIALLY FIXED** | 38 字节通过 ✅；但空文件仍报"找不到" |
+| 4 | 未知角色抛堆栈+泄漏路径 | **✅ FIXED** | 友好提示 + exit 2 + 无路径 |
+| 5 | `verify --all` 报 `true` | **✅ FIXED** | 不带目录正确回退 `ops` |
+| 6 | `gate.mjs` 缺 isMainModule | **⚠️ PARTIALLY FIXED** | gate 7ms 通过 ✅；taskcard 仍 exit(2) |
+
+**统计：4 个 FIXED / 2 个 PARTIALLY FIXED / 0 个 STILL BROKEN。**
+
+两条 PARTIALLY 都**不影响正常使用**：
+- #3 是文案不精确（功能判定正确）
+- #6 的另一半在另一个文件（gate 本身已好）
+
+---
+
+## 4.9 复测结论
+
+Lead 的 6 处修法**全部生效**，最严重的 P0（假通过）已彻底解决，且没有修成"永远红"。
+两个 PARTIALLY 都不是"修失败"，而是：
+- #3：修了阈值，没顺带改文案
+- #6：修了被点名的文件，同类问题在另一个文件（**这是我初测漏报造成的**）
+
+---
+
+## 4.10 复测红线自查
+
+| 红线 | 状态 |
+|---|---|
+| 修改工具行为 | ✅ 未修改任何工具代码（只有 Lead 在 22:02 前改的） |
+| 临时目录清理 | ✅ `%TEMP%\w7-*` 已删，0 残留 |
+| 触碰 site/ tests/ scripts/ | ✅ 未触碰 |
+| 复测产物含本机路径 | ✅ 全部用 `<用户名>` 占位；已用 gate 自身规则验证 0 命中 |

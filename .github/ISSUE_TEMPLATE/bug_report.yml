@@ -1,0 +1,81 @@
+name: Bug 反馈
+description: 描述一个可复现的问题。请使用虚构示例，不要提交真实决策内容。
+title: '[Bug] '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。
+
+        **提交前请确认：**
+        - 请勿填写真实的工作、健康、财务、家庭或法律决策内容。用虚构示例（如「方案 A / 方案 B」）说明即可。
+        - 截图中如含私人内容，请先打码。
+        - 不要粘贴任何 Token、密钥或凭据。
+
+  - type: textarea
+    id: behavior
+    attributes:
+      label: 遇到了什么问题？
+      description: 一句话说清现象。如果涉及具体数字，请写出你看到的数值。
+      placeholder: 例如：6 个因素、权重全部相等时，贡献表里每项显示 16.7%，6 项相加是 100.2%，但页面下方写着"占比加起来一定是 100%"。
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 越具体越好。请写明用了几个因素、大概的评分和权重，以及点了哪些按钮。
+      placeholder: |
+        1. 打开在线站点
+        2. 点 2 次「加一个因素」，变成 6 个
+        3. 点「权重全部拉平」
+        4. 展开「看看这个分数是怎么来的」
+        5. 看「权重占比」一列
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 你预期看到什么？
+      placeholder: 例如：6 项占比相加应为 100.0%。
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 问题出在哪个环节？
+      options:
+        - 打分或权重输入
+        - 分数 / 差值显示
+        - 贡献拆解表
+        - 反转阈值（什么条件会翻转）
+        - 最该验证的假设
+        - 导出 / 导入 / 分享
+        - 示例载入
+        - 移动端 / 排版
+        - 无障碍（键盘、读屏）
+        - 不确定
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: 浏览器及设备
+      placeholder: 如 Windows 11 / Chrome 141；或 iPhone 15 / Safari
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: honesty
+    attributes:
+      label: 补充确认
+      options:
+        - label: 我使用的是虚构示例，未包含真实个人决策信息
+          required: true
+        - label: 我已确认此问题不是"分数不是概率"这类设计本身的特性（即：我没有把"它不预测未来"当作 bug 上报）
+          required: false

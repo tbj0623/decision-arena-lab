@@ -1,0 +1,76 @@
+{
+  "generatedAt": "2026-10-29T14:58:54.851Z",
+  "commit": "7cb5ec51c2d68f72eaf8d544176fdbaac43bb1de",
+  "baseUrl": "http://127.0.0.1:8099/",
+  "note": "真实浏览器（Playwright Chromium）从真实运行页面截取。未使用设计原型或 AI 生成图。",
+  "shots": [
+    {
+      "file": "docs/screenshots/01-desktop-hero-light.png",
+      "name": "desktop-hero-light",
+      "viewport": "1440×900",
+      "theme": "light",
+      "commit": "7cb5ec51c2d68f72eaf8d544176fdbaac43bb1de"
+    },
+    {
+      "file": "docs/screenshots/02-desktop-hero-dark.png",
+      "name": "desktop-hero-dark",
+      "viewport": "1440×900",
+      "theme": "dark",
+      "commit": "7cb5ec51c2d68f72eaf8d544176fdbaac43bb1de"
+    },
+    {
+      "file": "docs/screenshots/03-desktop-hero-tie.png",
+      "name": "desktop-hero-tie",
+      "viewport": "1440×900",
+      "theme": "light",
+      "commit": "7cb5ec51c2d68f72eaf8d544176fdbaac43bb1de"
+    },
+    {
+      "file": "docs/screenshots/04-desktop-result-flip.png",
+      "name": "desktop-result-flip",
+      "viewport": "1440×900",
+      "theme": "light",
+      "scrollTo": "#result-card",
+      "commit": "7cb5ec51c2d68f72eaf8d544176fdbaac43bb1de"
+    },
+    {
+      "file": "docs/screenshots/05-desktop-workspace.png",
+      "name": "desktop-workspace",
+      "viewport": "1440×1200",
+      "theme": "light",
+      "scrollTo": "#workspace",
+      "commit": "7cb5ec51c2d68f72eaf8d544176fdbaac43bb1de"
+    },
+    {
+      "file": "docs/screenshots/06-mobile-hero-375.png",
+      "name": "mobile-hero-375",
+      "viewport": "375×812",
+      "theme": "light",
+      "fullPage": true,
+      "commit": "7cb5ec51c2d68f72eaf8d544176fdbaac43bb1de"
+    },
+    {
+      "file": "docs/screenshots/07-mobile-hero-390.png",
+      "name": "mobile-hero-390",
+      "viewport": "390×844",
+      "theme": "light",
+      "commit": "7cb5ec51c2d68f72eaf8d544176fdbaac43bb1de"
+    },
+    {
+      "file": "docs/screenshots/08-mobile-result.png",
+      "name": "mobile-result",
+      "viewport": "390×844",
+      "theme": "light",
+      "scrollTo": "#result-card",
+      "commit": "7cb5ec51c2d68f72eaf8d544176fdbaac43bb1de"
+    },
+    {
+      "file": "docs/screenshots/09-desktop-reduced-motion.png",
+      "name": "desktop-reduced-motion",
+      "viewport": "1440×900",
+      "theme": "light",
+      "reducedMotion": true,
+      "commit": "7cb5ec51c2d68f72eaf8d544176fdbaac43bb1de"
+    }
+  ]
+}

@@ -18,7 +18,7 @@
 | 写入者 | 独占写入区 | 只读区 |
 |---|---|---|
 | **Lead** | 根目录（`README` `STATUS` `BLOCKERS` `CHECKPOINT` `FINAL_REPORT` `HANDOFF`）、`scripts/`、`docs/`、`FACTORY_KIT/`、`site/core.mjs` | 全部 |
-| product-owner | `work/product/` | `site/core.mjs`、`docs/` |
+| product-owner | `docs/product/` | `site/core.mjs`、`docs/` |
 | logic-engineer | `tests/core/` | `site/core.mjs`（**只读**） |
 | ux-writer | `site/styles/`、`work/ux/` | `site/index.html`、`site/app.mjs` |
 | ui-engineer | `site/index.html`、`site/app.mjs` | `site/core.mjs`、`site/features/` |
@@ -48,7 +48,7 @@
 本项目里 Lead 改 `core.mjs` 两次，每次都重跑了：
 ```bash
 node --test                    # 45 条算法测试
-node work/product/verify-journeys.mjs   # 5 条旅程对拍
+node docs/product/verify-journeys.mjs   # 5 条旅程对拍
 ```
 
 **这个模式的前提**：读者不能"顺手改一下"。一旦读者变成写者，模式立刻失效。
@@ -57,7 +57,7 @@ node work/product/verify-journeys.mjs   # 5 条旅程对拍
 
 **不要直接改别人的文件。** 三个步骤：
 
-1. **写建议文件**到自己的区，例如 `work/product/SUGGEST_core_api.md`，
+1. **写建议文件**到自己的区，例如 `docs/product/SUGGEST_core_api.md`，
    内容是：问题、复现输入、期望行为、建议改法。
 2. **send_message 给 Lead**，一句话说明"建议已写，路径是 X"。
 3. **Lead 判断并合并**。如果接受，由 Lead（或该文件的唯一写入者）修改，然后重跑全部测试。

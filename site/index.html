@@ -4,9 +4,38 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="description" content="反悔雷达 Decision Arena — 不是替你预测未来，而是找出什么条件会改变你的选择。纯本地、不需要登录的主观决策敏感性工具。">
+<meta name="description" content="把纠结的选择拆成权重、评分和翻转条件，看清什么会改变你的决定。纯本地，不需要登录。">
 <title>反悔雷达 · Decision Arena</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2315324b'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%237fe3c3' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%237fe3c3'/%3E%3C/svg%3E">
+
+<!-- favicon 用真实文件，不再内联 data: URI（V9 P0-A） -->
+<link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./assets/brand-mark-512.png">
+
+<!--
+  Open Graph / Twitter Card（V9 P1-F）
+  · URL 必须是**绝对 HTTPS**：社交平台的抓取器不会解析相对路径
+  · 图片必须是**本站内本地资源**：不能用外部图床
+  · 描述里不出现"预测/成功率"这类词（V9 硬要求）
+-->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="反悔雷达 Decision Arena">
+<meta property="og:url" content="https://tbj0623.github.io/decision-arena-lab/">
+<meta property="og:title" content="反悔雷达 · 看清什么条件会改变你的选择">
+<meta property="og:description" content="把纠结的选择拆成权重、评分和翻转条件，看清什么会改变你的决定。纯本地，不需要登录。">
+<meta property="og:image" content="https://tbj0623.github.io/decision-arena-lab/assets/og-card.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="反悔雷达：两条线相交的翻转示意图，标注 50% 临界点">
+<meta property="og:locale" content="zh_CN">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="反悔雷达 · 看清什么条件会改变你的选择">
+<meta name="twitter:description" content="把纠结的选择拆成权重、评分和翻转条件，看清什么会改变你的决定。纯本地，不需要登录。">
+<meta name="twitter:image" content="https://tbj0623.github.io/decision-arena-lab/assets/og-card.png">
+<meta name="twitter:image:alt" content="反悔雷达：两条线相交的翻转示意图">
+
+<link rel="canonical" href="https://tbj0623.github.io/decision-arena-lab/">
 <link rel="stylesheet" href="./styles/app.css">
 </head>
 <body>
@@ -46,33 +75,71 @@
 
   <!-- ───────────── 首屏 ───────────── -->
   <section class="hero wrap" id="top">
-    <p class="eyebrow">主观决策 · 敏感性分析 · 纯本地</p>
-    <h1>不是替你预测未来，<br class="br-wide">而是找出<em>什么条件会改变你的选择</em>。</h1>
-    <p class="lede">
-      给两个在选择之间犹豫的方案打分，调一调你在意的权重。
-      反悔雷达会告诉你：现在的倾向有多稳、哪个因素的权重一旦改变结论就会翻过来、
-      以及你最该先去核实哪一条假设。
-    </p>
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">主观决策 · 敏感性分析 · 纯本地</p>
+        <h1>你真正犹豫的，<br class="br-wide">也许只是<em>一个条件</em>。</h1>
+        <p class="lede">
+          把两个选择摊开比较，找到让结论翻转的临界点，
+          再去验证真正重要的那件事。
+        </p>
 
-    <div class="hero-actions">
-      <button type="button" class="btn btn-primary btn-lg" data-action="start-blank">
-        自己开始
-      </button>
-      <a class="btn btn-ghost btn-lg" href="#examples">先看一个例子</a>
+        <div class="hero-actions">
+          <button type="button" class="btn btn-primary btn-lg" data-action="start-blank">
+            免费开始分析
+          </button>
+          <button type="button" class="btn btn-ghost btn-lg" data-action="demo-run">
+            30 秒看懂示例
+          </button>
+        </div>
+
+        <ul class="hero-facts" role="list">
+          <li><span aria-hidden="true">🔒</span> 无需登录</li>
+          <li><span aria-hidden="true">🙈</span> 只在本地计算</li>
+          <li><span aria-hidden="true">📐</span> 公式公开</li>
+        </ul>
+
+        <details class="hero-boundary">
+          <summary>它不是什么（点开看边界）</summary>
+          <p>
+            得分来自<strong>你自己打的分数和你设的权重</strong>，不是成功率、不是预测、也不是科学测量。
+            它只帮你把"我到底在意什么"摊开看清楚。
+            医疗、法律、财务这类高风险决定，请咨询有资质的专业人士，本工具只能帮你列要素。
+          </p>
+        </details>
+      </div>
+
+      <!-- 真实交互示例：数据来自 EXAMPLES，计算来自 site/core.mjs，不是硬编码 -->
+      <aside class="hero-demo" id="hero-demo" aria-labelledby="hero-demo-title">
+        <div class="hero-demo-head">
+          <span class="hero-demo-kicker">真实示例 · 可拖动</span>
+          <span class="hero-demo-badge" aria-hidden="true">LIVE</span>
+        </div>
+        <h2 class="hero-demo-title" id="hero-demo-title">正在载入示例…</h2>
+        <div class="hero-demo-scores">
+          <div class="hero-demo-score" data-side="A">
+            <span class="hero-demo-score-label">方案 A</span>
+            <strong class="hero-demo-score-num" id="hero-score-a">—</strong>
+            <span class="hero-demo-bar"><i id="hero-bar-a"></i></span>
+          </div>
+          <div class="hero-demo-score" data-side="B">
+            <span class="hero-demo-score-label">方案 B</span>
+            <strong class="hero-demo-score-num" id="hero-score-b">—</strong>
+            <span class="hero-demo-bar"><i id="hero-bar-b"></i></span>
+          </div>
+        </div>
+        <div class="hero-demo-slider">
+          <label for="hero-slider" id="hero-slider-label">调整权重</label>
+          <output for="hero-slider" id="hero-slider-out">—</output>
+          <input type="range" id="hero-slider" min="0" max="100" step="any" value="50">
+        </div>
+        <p class="hero-demo-verdict" id="hero-verdict" role="status" aria-live="polite">正在计算…</p>
+        <p class="hero-demo-caveat">
+          以上数字由你在这里拖动的位置实时算出，公式与工作区完全相同。它显示的是
+          <strong>你给的评分和权重</strong>之间的关系，不是对未来结果的预估。
+        </p>
+      </aside>
     </div>
-
-    <ul class="hero-facts" role="list">
-      <li><span aria-hidden="true">🔒</span> 数据只在你的浏览器里，不上传</li>
-      <li><span aria-hidden="true">🙈</span> 不用登录、不留账号</li>
-      <li><span aria-hidden="true">📐</span> 公式公开，你可以自己算一遍</li>
-    </ul>
-
-    <aside class="notice notice-warn" role="note">
-      <strong>先说清楚它不是什么：</strong>
-      得分来自<strong>你自己打的分数和你设的权重</strong>，不是成功率、不是预测、也不是科学测量。
-      它只帮你把"我到底在意什么"摊开看清楚。
-      医疗、法律、财务这类高风险决定，请咨询有资质的专业人士，本工具只能帮你列要素。
-    </aside>
   </section>
 
   <!-- ───────────── 示例 ───────────── -->

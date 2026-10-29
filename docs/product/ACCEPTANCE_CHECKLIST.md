@@ -2,7 +2,7 @@
 
 > 规则：每条都必须能被**命令**或**人工观察**验证。写不出验证方式的条目不准进这张表。
 > 勾选前必须真的执行过验证动作；`[x]` 后面括注验证人与时间。
-> 命令默认在 `decision-arena-lab` 根目录执行。回归脚本：`node work/product/verify-journeys.mjs`
+> 命令默认在 `decision-arena-lab` 根目录执行。回归脚本：`node docs/product/verify-journeys.mjs`
 
 状态：`[ ]` 未验 / `[x]` 通过 / `[!]` 不通过（必须附问题单）
 
@@ -33,8 +33,8 @@
 <!-- 验证于 2026-10-29 22:0x，方法：权重为 type=range min=0，负值无法输入；0 被接受并标注「权重为 0，不参与本次计算」。 -->
 | A-7 | 全零权重被拦下且可一键修复 | 全设 0 → 出现阻断提示（`ALL_ZERO_WEIGHTS`）；P1 按钮存在时点击后变为等权 | [x] |
 <!-- 验证于 2026-10-29 22:0x，方法：权重全 0 → result-body 隐藏、显示「所有因素的权重都是 0，没法算」；「权重全部拉平」按钮存在且可一键变等权。 -->
-| A-8 | 分数公式正确 | `node work/product/verify-journeys.mjs` 输出 `PASS 全部通过`，退出码 0 | [x] |
-<!-- 验证于 2026-10-29 22:0x，方法：node work/product/verify-journeys.mjs → PASS，退出码 0。 -->
+| A-8 | 分数公式正确 | `node docs/product/verify-journeys.mjs` 输出 `PASS 全部通过`，退出码 0 | [x] |
+<!-- 验证于 2026-10-29 22:0x，方法：node docs/product/verify-journeys.mjs → PASS，退出码 0。 -->
 | A-9 | 分数恒在 0–100 | 全 10 分 → A=100.0、B=0.0；全 0 分 → A=0.0；页面同样不越界 | [x] |
 <!-- 验证于 2026-10-29 22:0x，方法：全 10 分 → 100.0 : 0.0；全 0 分 → 0.0 : 0.0，页面无越界。 -->
 | A-10 | 贡献拆解可对账 | 页面每因素 `pointsA` 相加与显示的 A 总分相差 **≤ 0.2**（1 位小数四舍五入的累积误差上限）；B 同理 | [x] |
@@ -171,7 +171,7 @@ console.log(s.scoreA.toFixed(1), s.scoreB.toFixed(1), s.difference.toFixed(1));}
 
 - Gate A 全 `[x]` 且 Gate C 全 `[x]`，Gate B 允许最多 0 项 `[!]`。
 - 存在任一 `[!]` → 只能内测，不得公开。
-- 时间不够时的取舍：只能按 `work/product/SCOPE_CUTS.md` 砍 P1，**不得通过降低 Gate B 标准来换取发布**。
+- 时间不够时的取舍：只能按 `docs/product/SCOPE_CUTS.md` 砍 P1，**不得通过降低 Gate B 标准来换取发布**。
 
 ### 当前闸门判定（2026-10-29 22:10）
 

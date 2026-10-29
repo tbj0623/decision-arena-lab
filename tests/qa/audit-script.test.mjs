@@ -43,10 +43,13 @@ const SECRETS = [
   { re: /-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----/, label: '私钥' },
 ];
 
-const SAFE_FRAGMENTS = [
-  /<link\s+rel="icon"\s+href="data:[^"]*">/gi,
-  /\{\s*re:\s*\/.*?\/[a-z]*,\s*label:\s*'[^']*'\s*\},?/g,
-];
+// 规则必须和真实审计脚本**同一份**，不能各存一份副本。
+//
+// 踩过的坑：这个测试原先自己复制了一份 SAFE_FRAGMENTS。
+// 后来我在 check-no-network.mjs 里加了 OG 元数据豁免，
+// 测试仍用旧副本 → 断言"真实仓库无违规"直接 fail。
+// 两份规则漂移了，而漂移的原因恰恰是"复制一份更省事"。
+import { SAFE_FRAGMENTS } from '../../scripts/check-no-network.mjs';
 
 const ALLOWLIST_LINE = [
   /^\s*(\*|\/\/|\/\*).*(不写|不发起|没有|禁止|不做|不可)/,
