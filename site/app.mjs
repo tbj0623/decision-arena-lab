@@ -691,16 +691,27 @@ function renderScores(analysis) {
   const a = analysis.options[0].label;
   const b = analysis.options[1].label;
 
+  // 打平判据全站统一成一条规则：**屏幕说打平 ⇔ 屏幕上两个数字一样**。
+  //
+  // 历史缺陷（定位复核）：结果卡用 core 的 `analysis.tie`（1e-9 精确判据），
+  // 翻转卡用"两个显示分数相等"。两套判据在 Δ=1e-9~0.05 之间会打架：
+  //   rent/laptop/longdist 点完「跳到精确临界点」后
+  //   翻转卡「就在临界点上…两边打平（差 0.0）」
+  //   结果卡「更倾向「市区的小两居」」+「领先 0.0 分」
+  // 9 个内置示例里 3 个稳定复现。现在两边都用显示值。
+  const tieShown = fmt1(analysis.scoreA) === fmt1(analysis.scoreB);
+
   if (verdict) {
-    if (analysis.tie) verdict.textContent = `按你现在的打分，两边打平。`;
+    if (tieShown) verdict.textContent = `按你现在的打分，两边打平。`;
     else verdict.textContent = `按你现在的打分，更倾向「${analysis.winner === 'A' ? a : b}」。`;
   }
 
   if (sub) {
-    if (analysis.tie) {
-      sub.textContent = '差值为 0。任何一点权重或评分的改动都可能让结果偏向一边。';
+    if (tieShown) {
+      sub.textContent = '两边显示分数相同。任何一点权重或评分的改动都可能让结果偏向一边。';
     } else {
-      const gapText = fmt1(absDiff);
+      // 差值也必须和两个显示分数同源（跨浏览器审计 F2）
+      const gapText = Math.abs(Number(fmt1(analysis.scoreA)) - Number(fmt1(analysis.scoreB))).toFixed(1);
       const tone = analysis.closeness === 'very-close' ? '这个差距非常接近，稍微改一下权重就可能翻过来。'
         : analysis.closeness === 'close' ? '这个差距不算大，结论并不牢靠。'
         : analysis.closeness === 'clear' ? '差距比较明显，但还不是决定性的。'
@@ -716,7 +727,7 @@ function updateClosenessPill(analysis) {
   pill.hidden = false;
   let text = '差距很大';
   let tone = 'ok';
-  if (analysis.tie) { text = '打平'; tone = 'neutral'; }
+  if (fmt1(analysis.scoreA) === fmt1(analysis.scoreB)) { text = '打平'; tone = 'neutral'; }
   else if (analysis.closeness === 'very-close') { text = '几乎打平'; tone = 'warn'; }
   else if (analysis.closeness === 'close') { text = '很接近'; tone = 'warn'; }
   else if (analysis.closeness === 'clear') { text = '比较明确'; tone = 'neutral'; }
@@ -1137,16 +1148,40 @@ function buildFlipSlider(flip) {
           recalc();             // 让结果卡、贡献表、翻转卡全部重算
         }
       }
-      const projected = describe(targetShare, { moveSlider: true });
       // 注意：上面 renderFactorList() + recalc() 会把整个翻转卡重建，
       // 所以**不能**往自己这个 jumpHint 里写提示 —— 它已经不在文档里了。
       // 实测（端到端走查发现）：点了按钮后确认文案消失、元素数量 1→0，
       // 等于"悄悄改了用户的数据还不告诉人"。
-      //
-      // 改写到卡片外的常驻状态区（recalc 不会重建它），并声明这是真实改动。
-      const msg = Math.abs(projected.difference) < 1e-6
-        ? `已把「${flip.label}」的权重真的改成 ${state.factors.find(f => f.id === flip.factorId)?.weight}（占比 ${pct(targetShare, 4)}）。上方结果、左侧权重滑杆、导出数据都已同步——两边分数相同。`
-        : `注意：此处残差 ${projected.difference.toExponential(2)}，未达到打平阈值。`;
+      // 改写到卡片外的常驻状态区（recalc 不会重建它）。
+
+      // ── 用**真实写回后的状态**复算，不能用目标占比的投影 ──
+      // 历史缺陷（定位复核）：原来用 describe(targetShare) 的残差判断成功，
+      // 而那个残差是在目标占比上算的（必然≈0）。一旦权重被 MAX_WEIGHT_UI 截断，
+      // 真实状态根本还没打平，toast 却照样说"两边分数相同"。
+      // 实测：需要 52.94% 的用例被截到 45.45%，分数 37.3/34.1 仍差 2.2，toast 报成功。
+      let actual = null;
+      try { actual = scoreDecision(state); } catch { actual = null; }
+      const appliedWeight = state.factors.find((f) => f.id === flip.factorId)?.weight;
+      const totalW = state.factors.reduce((acc, f) => acc + f.weight, 0);
+      const actualShare = totalW > 0 && appliedWeight != null ? appliedWeight / totalW : null;
+      const tieNow = actual
+        ? fmt1(actual.scoreA) === fmt1(actual.scoreB)
+        : Math.abs(projected?.difference ?? 1) < 1e-9;
+      const truncated = actualShare != null && Math.abs(actualShare - targetShare) > 0.0005;
+
+      let msg;
+      if (tieNow) {
+        msg = `已把「${flip.label}」的权重真的改成 ${appliedWeight}（占比 ${pct(actualShare ?? targetShare, 4)}）。上方结果、左侧权重滑杆、导出数据都已同步——两边分数相同。`;
+      } else if (truncated) {
+        const need = (targetShare * (totalW - (appliedWeight ?? 0))) / (1 - targetShare);
+        msg = `调不到。要打平需要「${flip.label}」的权重约 ${need.toFixed(1)}，但权重滑杆上限是 ${MAX_WEIGHT_UI}。` +
+          `现在只能给到 ${appliedWeight}（占比 ${pct(actualShare, 2)}），两边仍差 ${fmt1(Math.abs(actual.difference))} 分。` +
+          `——这条结论只能靠调整评分来验证，不是调权重能解决的。`;
+      } else if (actual) {
+        msg = `已把「${flip.label}」的权重改成 ${appliedWeight}（占比 ${pct(actualShare, 2)}），但两边仍差 ${fmt1(Math.abs(actual.difference))} 分，未达到打平。`;
+      } else {
+        msg = '调整后没有算出结果，请检查输入。';
+      }
       const live = document.querySelector('#equal-weights-note') || document.querySelector('#factors-error');
       if (live) {
         live.textContent = msg;
