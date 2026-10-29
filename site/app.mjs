@@ -241,8 +241,14 @@ function makeRatingRow(factor, side) {
     hidden: true,
   });
 
-  const showError = (lastValid) => {
-    error.textContent = `评分必须在 0 到 10 之间。下面显示的结果仍按上一次有效评分 ${lastValid} 计算，离开这个输入框会恢复到 ${lastValid}。`;
+  // 错误提示要说清两件事：合法范围是什么、以及**当前是按哪个值在算**。
+  // 后半句很重要 —— 用户必须知道自己看到的分数对应哪个输入，
+  // 否则「按上一次有效值 1 计算」这种话会让从没输过 1 的人一头雾水。
+  const showError = (lastValid, kind = null) => {
+    const rangeText = kind === 'step'
+      ? '评分必须是 0 到 10 之间、且以 0.5 为步进的数'
+      : '评分必须在 0 到 10 之间';
+    error.textContent = `${rangeText}。目前的结果仍按你上一次输入的 ${lastValid} 计算；离开这个输入框会恢复成 ${lastValid}。`;
     error.hidden = false;
   };
   const clearError = () => {
@@ -258,16 +264,40 @@ function makeRatingRow(factor, side) {
     inputmode: 'decimal',
     'aria-label': `${side === 'A' ? '方案 A' : '方案 B'} 在这项上的评分（0–10）`,
     dataset: { factorId: factor.id, side },
+    // 评分输入：**只在值合法时才写进 factor.ratings 并重算**。
+    //
+    // 历史缺陷（边界压测 BUG-03，最严重的一个）：
+    // 原实现是"边打边提交" —— 用户敲 `11` 时，第一下敲的 `1` 是合法值，
+    // 于是立刻被写进 ratings 并重算（70.7/63.6 → 42.1/63.6）；
+    // 第二下 `1` 拼成 `11` 后虽然标了 aria-invalid，但**分数已经被污染**。
+    // 失焦时又按"回滚到上一次有效值"把输入框填成 `1` ——
+    // 用户从没输过 1，界面却变成了 1。
+    //
+    // 连带后果：告警还亮着时点导出，写进文件的就是那个中间值。
+    //
+    // 修法：非法值只标记错误、**不写入、不重算**。
+    // 这样失焦回滚时回到的是"用户上一次真正确认过的值"，不是中间态。
+    // 空串同样不写入（用户可能在清空后重新输入）。
     oninput: (e) => {
       const raw = e.target.value;
-      if (raw === '') { e.target.dataset.pending = '1'; clearError(); e.target.removeAttribute('aria-invalid'); return; }
+      if (raw === '') {
+        e.target.dataset.pending = '1';
+        e.target.removeAttribute('aria-invalid');
+        e.target.removeAttribute('aria-describedby');
+        clearError();
+        return;
+      }
       delete e.target.dataset.pending;
       const num = Number(raw);
-      if (!Number.isFinite(num) || num < 0 || num > 10) {
+      // 同时校验 step（HTML 的 step="0.5" 只约束浏览器 UI，不约束 Number()）
+      const stepOk = Number.isInteger(num * 2);
+      const invalid = !Number.isFinite(num) || num < 0 || num > 10 || !stepOk;
+      if (invalid) {
         e.target.setAttribute('aria-invalid', 'true');
         e.target.setAttribute('aria-describedby', errId);
-        showError(factor.ratings[side]);
-        return;
+        // 提示里说清楚"当前按哪个值算"，而这个值一定是用户自己输过的
+        showError(factor.ratings[side], stepOk ? null : 'step');
+        return; // ← 关键：不写 factor.ratings，不 scheduleRecalc
       }
       e.target.removeAttribute('aria-invalid');
       e.target.removeAttribute('aria-describedby');
@@ -382,12 +412,30 @@ function recalc() {
   // 而"上面填好两个方案的名字"那句提示是隐藏的——
   // 用户看到的是一个**凭空出现的分数**，而他的标题框是空的。
   //
-  // 判据：标题空 + 两个方案名还是默认值 → 就是"还没开始"。
-  // 不看因素（因素是预填好的默认值，不是用户输入）。
+  // 判据：**与出厂默认值完全一致** 才算"还没开始"。
+  //
+  // 历史缺陷（边界压测 BUG-10）：原判据只看标题 + 两个方案名。
+  // 于是这些情况全部被误判成"还没开始"，结果区整块隐藏、
+  // 提示"上面填好两个方案的名字"，而用户明明已经动过了：
+  //   · 只改了评分（5 → 8）
+  //   · 只拖了权重滑杆
+  //   · 只点了「权重全部拉平」
+  //   · 只改了因素名
+  //   · 导入了一份 title 为空、方案名恰好是「方案 A」「方案 B」的合法数据 ← 最坑
+  //
+  // 正确判据：拿 createEmptyDecision() 的出厂值做基准，逐字段比。
+  // 任何一处不同 = 用户动过 = 该出结果。
+  const baseline = createEmptyDecision();
   const untouched =
     !state.title &&
-    state.options[0].label === '方案 A' &&
-    state.options[1].label === '方案 B';
+    state.options[0].label === baseline.options[0].label &&
+    state.options[1].label === baseline.options[1].label &&
+    state.factors.length === baseline.factors.length &&
+    state.factors.every((f, i) => {
+      const b = baseline.factors[i];
+      return f.label === b.label && f.weight === b.weight &&
+        f.ratings.A === b.ratings.A && f.ratings.B === b.ratings.B;
+    });
 
   if (check.ok && untouched) {
     if (resultBody) resultBody.hidden = true;
@@ -1244,10 +1292,28 @@ function initHeroDemo() {
     slider.setAttribute('aria-valuetext', `「${knobFactor.label}」权重占比 ${pct(share, 1)}`);
 
     // aria-live 的播报策略：拖动过程中**不**逐格播报长句。
-    // 拖动时每秒会触发几十次 input，若每次都更新 live 区域，
-    // 读屏会被一整串重复的"此刻更倾向…差…分"淹没，反而听不到有用信息。
-    // 所以：input 时只更新视觉数字，松手（change）时才更新这段文字。
-    if (!announce) return;
+    // ── 视觉 vs 播报：必须解耦（这是 GIF 自查抓出来的真实缺陷）──
+    //
+    // 原实现：`if (!announce) return;` —— 拖动时**连判定行都不更新**，
+    // 只有松手才刷新。理由是"拖动时每秒几十次 input，读屏会被刷屏"。
+    // 这个理由本身是对的，但解法错了：它把「不播报」实现成了「不渲染」。
+    //
+    // 实测后果（growth-producer 逐帧解码 demo-30s.gif 发现，第 108–114 帧）：
+    // 在打平点松手后继续拖动到 42.8%，屏幕上是 **A 64.6 / B 66.8（明显没打平）**，
+    // 但「临界」徽章和"两个方案打平了"还挂着 —— 约 1.8 秒的自相矛盾画面。
+    // 这段 GIF 直接发出去，观众会认为工具在骗人。
+    //
+    // 正确解法：**判定行始终更新（视觉正确），只有 aria-live 播报在拖动中跳过**。
+    // 这样屏幕上永远自洽，读屏也不会被刷屏。
+    // 靠"拍摄纪律"防不住这个 —— 只要有任何第二个素材（截图、录屏、别人自己用），
+    // 这个瞬间就会被反复撞上。只能改代码。
+    const liveRegion = verdict.closest('[aria-live]') || verdict;
+    if (!announce) {
+      // 拖动中：更新视觉，但临时把 aria-live 摘掉，避免读屏刷屏
+      liveRegion.setAttribute('aria-live', 'off');
+    } else {
+      liveRegion.setAttribute('aria-live', 'polite');
+    }
 
     // 「打平」的判据必须和**显示的差值**一致。
     //
