@@ -32,9 +32,9 @@
 ![首屏 · 桌面端](docs/screenshots/01-desktop-hero-light.png)
 
 右侧那张卡不是插图——它读的是和下面工作区**同一份** `EXAMPLES` 数据，
-跑的是**同一个** `core.mjs`。把滑杆拖到 39.4%，两个分数会真的打平：
+跑的是**同一个** `core.mjs`。把滑杆拖到约 39.39%（精确 39.3939%），两个分数会真的打平：
 
-![真实打平状态：拖到 39.4% 时 A 与 B 都是 66.1](docs/screenshots/03-desktop-hero-tie.png)
+![真实打平状态：精确交点在 39.3939%，画面显示 A 与 B 都是 66.1](docs/screenshots/03-desktop-hero-tie.png)
 
 <details>
 <summary>深色主题 / 手机端 / 结果区 截图</summary>
@@ -140,7 +140,7 @@ node scripts/check-no-network.mjs  # 核验"零外部请求 / 零持久化"
 | 存储 | **不使用** `localStorage` / `sessionStorage` / Cookie / IndexedDB |
 | 网络 | 运行时**零外部请求**，可由 `scripts/check-no-network.mjs` 自动核验 |
 | 计算 | [`site/core.mjs`](site/core.mjs) — 零依赖纯函数，含输入校验与稳定错误码 |
-| 测试 | `node --test`（无参数）。测试套件约 **187 项**，覆盖数学边界、UI 契约、零网络与安全审计。**具体通过数以你本地运行为准**——本项目仍在迭代，不在文档里写死数字；若出现失败，请以 `node --test` 输出为准并提 Issue |
+| 测试 | `node --test`（无参数）。测试套件约 **211 项**，覆盖数学边界、UI 契约、零网络与安全审计。**具体通过数以你本地运行为准**——本项目仍在迭代，不在文档里写死数字；若出现失败，请以 `node --test` 输出为准并提 Issue |
 | 部署 | GitHub Pages（`.github/workflows/pages.yml`） |
 | 导出 | 生成 JSON 文件，浏览器本地完成，不经任何服务器 |
 

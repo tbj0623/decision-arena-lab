@@ -2667,19 +2667,24 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
 @media (prefers-contrast: more) {
   #scale-note {
     background: var(--bg-sunk);
-    border-left: 4px solid var(--ink);
-    border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+    border: 2px solid var(--ink);
+    border-radius: var(--radius-xs);
   }
-  #scale-note::before { display: none; }
+  #scale-note::before { background: var(--bg); color: var(--ink); border: 1px solid var(--ink); }
 }
 @media (forced-colors: active) {
   #scale-note {
     color: CanvasText;
     background: Canvas;
-    border-left: 3px solid CanvasText;
+    border: 1px solid CanvasText;
     forced-color-adjust: none;
   }
-  #scale-note::before { display: none; }
+  #scale-note::before {
+    color: CanvasText;
+    background: Canvas;
+    border: 1px solid CanvasText;
+    forced-color-adjust: none;
+  }
   #scale-note strong { color: CanvasText; }
 }
 
@@ -2848,7 +2853,13 @@ main:focus:not(:focus-visible) {
   .flip-note {
     color: CanvasText;
     background: Canvas;
-    border-left: 3px solid CanvasText;
+    border: 1px solid CanvasText;
+    forced-color-adjust: none;
+  }
+  .flip-note::before {
+    color: CanvasText;
+    background: Canvas;
+    border: 1px solid CanvasText;
     forced-color-adjust: none;
   }
 }

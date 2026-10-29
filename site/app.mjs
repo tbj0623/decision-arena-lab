@@ -16,6 +16,7 @@ import {
   validate,
   createEmptyDecision,
   projectAtShare,
+  diagnoseNoFlip,
   ValidationError,
 } from './core.mjs';
 
@@ -714,10 +715,32 @@ function renderFlip(analysis, thresholds, flip) {
 
   if (!anyFeasible && !analysis.tie) {
     box.append(el('p', { class: 'flip-headline', text: '在只调整单个因素权重的情况下，结论翻不过来。' }));
-    box.append(el('p', {
-      class: 'result-empty',
-      text: '这不代表你的决定就一定对，只代表你给两个方案的评分在各因素上方向一致。想真正改变结论，需要去修改那几条评分本身（也就是去核实事实），而不是继续纠结权重。',
-    }));
+
+    // 说清**为什么**翻不过来 —— 不是所有"翻不过来"都是同一个原因。
+    //
+    // diagnoseNoFlip 区分三种真实成因（logic-engineer 用 2 万组随机输入验证）：
+    //   ① ALL_SAME_SIGN  所有 d_k 同号（city 全负 / oldguitar 全正）
+    //                    Δ 是 d 的非负加权和，同号则 Δ 恒同号，调权重改不了方向
+    //   ② ZERO_GAP       至少一个因素上 A/B 同分 —— 它"不表态"，破坏同号前提
+    //                    实测占 0 可行样本的 57%，**不是边角情况**
+    //   ③ NO_LEVERAGE    所有 d_k 都是 0（两边评分完全一样）—— 已被上面的 tie 分支接走
+    //
+    // 为什么必须分开说：之前只有一句笼统的"方向一致"，
+    // 对 ZERO_GAP 是**说错原因** —— 真相是那些因素毫无区分度，
+    // 用户该做的是先打出评分差别，而不是继续调权重。
+    let whyText = '这不代表你的决定就一定对，只代表你给两个方案的评分在各因素上方向一致。想真正改变结论，需要去修改那几条评分本身（也就是去核实事实），而不是继续纠结权重。';
+    try {
+      const dx = diagnoseNoFlip(state);
+      if (dx && dx.reason === 'ALL_SAME_SIGN') {
+        whyText = '你在每个因素上都给了同一个方案更高（或更低）的分——评分方向完全一致。这种一致性是很强的信号：结论稳，调权重改不了。要动它，只能回去质疑评分本身。';
+      } else if (dx && dx.reason === 'ZERO_GAP') {
+        whyText = '有几个因素上，你给两个方案打的分完全一样——它们对结果没有区分作用。在这种前提下调权重是白费力气，因为那些因素本来就"不表态"。想改变结论，先回去给这些因素打出真实的差别。';
+      } else if (dx && dx.reason === 'OUT_OF_RANGE') {
+        whyText = '理论上某个因素的权重稍微一调就能翻过来，但那需要把权重调到一个现实中做不到的位置（超出 0–100%）。所以按你现在打的分数，它其实是个稳定的倾向。想验证它稳不稳，去核实那几条评分本身。';
+      }
+    } catch { /* 诊断失败就用默认文案，不影响主流程 */ }
+
+    box.append(el('p', { class: 'result-empty', text: whyText }));
     box.append(buildThresholdList(thresholds));
     return;
   }
@@ -737,7 +760,7 @@ function renderFlip(analysis, thresholds, flip) {
   if (feasibleCount(thresholds) >= 3) {
     box.append(el('p', {
       class: 'flip-note',
-      text: '上面几条不是"要同时满足的条件"，而是"随便做到哪一条都能翻"——挑你觉得最容易做到的那条去验证就行。',
+      text: '上面几条不是「要同时满足的条件」，而是「随便做到哪一条都能翻」——挑你觉得最容易做到的那条去验证就行。',
     }));
   }
 

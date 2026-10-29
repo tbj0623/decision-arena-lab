@@ -32,10 +32,10 @@ No sign-up · Nothing uploaded · Completely free · Works the moment you open i
 ![Hero · desktop](docs/screenshots/01-desktop-hero-light.png)
 
 That card on the right is not an illustration. It reads the **same** `EXAMPLES` data as the
-workspace below and runs the **same** `core.mjs`. Drag the slider to 39.4% and the two scores
-really do tie:
+workspace below and runs the **same** `core.mjs`. The exact crossing is about 39.39% of the
+weight (39.3939% to four places); at a 39.4% slider position both sides read 66.1:
 
-![A real tie: at 39.4%, both A and B read 66.1](docs/screenshots/03-desktop-hero-tie.png)
+![Both sides reading 66.1 at a 39.4% slider position](docs/screenshots/03-desktop-hero-tie.png)
 
 <details>
 <summary>Dark theme / mobile / results screenshots</summary>
@@ -116,7 +116,7 @@ Flip point          Hold one factor's share at t and redistribute
 ```
 
 - **`t*` falls outside 0–1** → it tells you plainly that moving this one factor alone cannot flip the result. **It does not make up a number.**
-- **`|Δ| < 1e-9`** → reported as a tie, with no winner declared.
+- **`|Δ| < 1e-9`** → reported as a tie, with no winner declared. A true tie is that narrow; the slider will usually land beside the exact crossing rather than on it, which is why it reports an approximate `t*` rather than promising that one particular setting hits it exactly.
 - The gap is always computed by subtracting the **unrounded** values, so rounding for display never nudges the result.
 
 The implementation sits in [`site/core.mjs`](site/core.mjs): **dependency-free pure functions**, usable from both Node and the browser, covered by unit tests. More on the edge cases in [Limitations](docs/LIMITATIONS.md).
@@ -147,7 +147,7 @@ node scripts/check-no-network.mjs  # verify "zero external requests / zero persi
 | Storage | **No** `localStorage` / `sessionStorage` / cookies / IndexedDB |
 | Network | **Zero external requests** at runtime, checked automatically by `scripts/check-no-network.mjs` |
 | Computation | [`site/core.mjs`](site/core.mjs) — dependency-free pure functions, with input validation and stable error codes |
-| Tests | `node --test` (no arguments). The suite is about 187 tests and covers the math's edge cases, the UI contract, and the zero-network and security audits. **The exact pass count comes from your own run** — this project is still in motion, so the docs don't hard-code a number; if anything fails, go by the `node --test` output and open an issue |
+| Tests | `node --test` (no arguments). The suite is about 211 tests and covers the math's edge cases, the UI contract, and the zero-network and security audits. **The exact pass count comes from your own run** — this project is still in motion, so the docs don't hard-code a number; if anything fails, go by the `node --test` output and open an issue |
 | Deployment | GitHub Pages (`.github/workflows/pages.yml`) |
 | Export | Generates a JSON file locally in your browser, never through a server |
 

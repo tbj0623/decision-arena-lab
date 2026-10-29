@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://tbj0623.github.io/decision-arena-lab/sitemap.xml
