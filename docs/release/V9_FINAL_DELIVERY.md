@@ -257,14 +257,14 @@ Auto-merging site/app.mjs              （试跑后已 --abort，未产生提交
 
 ### 推送也通了
 本机 git 没配 credential helper，裸 `git push` 会卡在认证环节。
-把 `gh auth token` 拼进远程 URL 就正常了 —— 已封装成 `node work/push-git.mjs`：
+把 `gh auth token` 拼进远程 URL 就正常了 —— 已封装成 `node scripts/push.mjs`：
 
 ```text
-$ node work/push-git.mjs --dry-run
+$ node scripts/push.mjs --dry-run
    06b552b..b370698  HEAD -> main
 ✓ dry-run 通过
 
-$ node work/push-git.mjs
+$ node scripts/push.mjs
 ✓ 远端 main = b370698（与本地一致）
 ```
 
