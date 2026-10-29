@@ -2907,3 +2907,18 @@ main:focus:not(:focus-visible) {
   .flip-preview-tag { border-color: CanvasText; color: CanvasText; background: Canvas; }
   .flip-preview-dot { background: CanvasText; }
 }
+
+/* 示例卡的列表项包装（a11y 审计 FAIL-1 修复）
+   <div role="list"> 的直接子元素应该是 listitem。
+   之前把 role="listitem" 直接写在 <button> 上，会**覆盖** button 语义，
+   读屏把卡片念成"列表项"，用户不知道能点。
+   现在用 <li> 提供列表语义，<button> 保持按钮语义，两者各司其职。 */
+.example-item {
+  display: flex;
+  margin: 0;
+  padding: 0;
+}
+.example-item > .example-card {
+  flex: 1 1 auto;
+  width: 100%;
+}

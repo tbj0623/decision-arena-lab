@@ -123,8 +123,17 @@ function renderExamples() {
     const card = el('button', {
       type: 'button',
       class: 'example-card',
-      role: 'listitem',
-      'aria-label': `载入示例：${ex.title}`,
+      // 不要写 role="listitem"！
+      //
+      // 历史缺陷（性能/可访问性审计 FAIL-1）：
+      // 这里原来是 `<button role="listitem">`。HTML 中 role 会**覆盖**元素的原生语义，
+      // 于是读屏把 9 张示例卡念成"列表项"而不是"按钮"，用户不知道它们能点。
+      // 键盘 Enter 仍能触发（原生 button 行为还在），所以是语义丢失而非功能损坏 ——
+      // 这种缺陷只有查 AX 树或用真读屏才能发现。
+      //
+      // 正确做法：容器 #example-grid 保留 role="list"，卡片本身保持 button 语义。
+      // 列表语义由容器提供，不靠子元素伪造。
+      'aria-label': `载入示例：${ex.title}（按钮）`,
       dataset: { example: ex.key },
       onclick: () => loadExample(ex.key),
     },
