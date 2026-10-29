@@ -108,6 +108,7 @@ let lastAnalysis = null;
 let lastThresholds = [];
 let lastFlip = null;
 let lastHypothesis = null;
+let lastDialogTrigger = null;
 /** 高风险命中结果：{risky, area, matched} 或 null */
 let lastHighRisk = null;
 
@@ -1088,8 +1089,22 @@ function openShare() {
   }
   const body = buildShareText();
   if (text) text.value = body;
-  if (dialog && typeof dialog.showModal === 'function') dialog.showModal();
-  else if (dialog) dialog.setAttribute('open', '');
+
+  // 记住是哪个元素打开的对话框。
+  //
+  // 无障碍缺陷（Lead 键盘走查发现）：
+  // Esc 关闭后 focus 会掉到 BODY，下一次 Tab 从页面最顶上重新开始——
+  // 键盘用户等于被踢回起点。原生 <dialog> 不会自动恢复焦点。
+  lastDialogTrigger = document.activeElement;
+
+  if (dialog && typeof dialog.showModal === 'function') {
+    dialog.showModal();
+    // 打开后把焦点放进对话框内（<textarea> 是可聚焦的只读区，
+    // 读屏会念出摘要内容，也保证 Tab 从对话框里开始而不是页面顶部）
+    if (text) setTimeout(() => text.focus(), 0);
+  } else if (dialog) {
+    dialog.setAttribute('open', '');
+  }
 }
 
 function resetAll() {
@@ -1341,9 +1356,42 @@ function bindEvents() {
         }
       }
     });
+
+    // 关闭后把焦点还给打开它的按钮。
+    //
+    // 无障碍缺陷（Lead 键盘走查实测）：原生 <dialog> 关闭时**不会**恢复焦点。
+    // Esc 之后 activeElement 变成 BODY，下一次 Tab 从页面最顶上重来——
+    // 键盘用户按 Esc 想"回去继续"，结果被扔回起点。
+    dialog.addEventListener('close', () => {
+      if (lastDialogTrigger && document.contains(lastDialogTrigger)) {
+        lastDialogTrigger.focus();
+      }
+      lastDialogTrigger = null;
+    });
+
+    // 焦点陷阱：Tab / Shift+Tab 在对话框内循环，不跑到背景页面。
+    //
+    // 实测漏洞：原版 Tab 到最后一个按钮后，焦点跳到 BODY（背景），
+    // 用户能在模态开着时操作背后的页面——违反模态语义。
+    dialog.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') return;
+      const focusables = [...dialog.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      )].filter((el) => !el.disabled && el.offsetParent !== null);
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    });
   }
 
-  // Esc 关闭原生 dialog 已由浏览器处理
+  // Esc 关闭原生 dialog 由浏览器处理；焦点恢复见上面的 close 监听
 }
 
 /* ───────────── 启动 ───────────── */

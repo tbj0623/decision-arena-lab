@@ -2632,3 +2632,21 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
   .notice-warn { line-height: 1.6; }
   .notice-warn { padding-block: 12px; }
 }
+
+/* --------------------------------------------------------------------------
+   Skip link 的焦点落点（无障碍修复）
+   --------------------------------------------------------------------------
+   问题：`<a href="#main">跳到主要内容</a>` 只改 URL hash，**不会移动键盘焦点**。
+   实测：按 Tab 到 skip link → 按 Enter → location.hash 变成 #main，
+   但 document.activeElement 仍是 BODY。读屏用户按了"跳到主要内容"，
+   焦点却没跟过去，下一次 Tab 仍从页面顶部开始 —— skip link 形同虚设。
+
+   修法：给 <main> 加 tabindex="-1"（可被程序聚焦，但不进 Tab 序列）。
+   配合下面的 outline 规则：它是程序聚焦目标，不是交互元素，
+   不该显示焦点环（否则鼠标用户点空白处也会看到一圈线）。
+   -------------------------------------------------------------------------- */
+/* 只在**鼠标/程序**聚焦时隐藏环；键盘 Tab 到它时仍显示（虽然 tabindex=-1 不进 Tab 序列，
+   但用户可能用脚本或读屏的"跳转"功能聚焦它，保留可见性更稳妥） */
+main:focus:not(:focus-visible) {
+  outline: none;
+}
