@@ -122,6 +122,76 @@ mit-license
 GitHub Social Preview 只影响 **GitHub 仓库链接**在社交平台的卡片。
 **线上站点**（`tbj0623.github.io/...`）的分享卡片由 `site/index.html` 里的 `<meta property="og:image">` 决定，两者是**两套独立配置**，不要以为设了一个另一个也好了。
 
+### 🔍 怎么验证 Social preview 真的生效了
+
+上传完**不要只看 Settings 页面里有没有图**——那只能证明你传了，不能证明 CDN 已经生效。
+按下面任一种方式做**外部验证**：
+
+#### 方式 1：GitHub 的 OpenGraph 图片端点（最快，30 秒）
+
+GitHub 为每个仓库生成一个 OG 图端点。**设置生效后**，这个地址会返回你自己上传的那张图：
+
+```bash
+# 把返回的 HTTP 状态和 Content-Type 记下来
+curl -sS -o /dev/null -w "%{http_code}  %{content_type}  %{size_download} B\n" \
+  -L https://opengraph.githubassets.com/1/tbj0623/decision-arena-lab
+```
+
+**判读**：
+
+| 现象 | 含义 |
+|---|---|
+| `200  image/png`，且下载体积 ≈ 90–200 KB | ✅ 大概率是你的图（GitHub 会重新编码，体积会变） |
+| 返回的是 GitHub 默认的灰色卡片 | ❌ 还没生效，或传的是默认图 |
+| **`429 Too Many Requests`** | ⚠️ **GitHub 对这个端点限流了**，这不代表设置有问题。等几分钟重试，或直接用方式 2 |
+| `404` / `302` 到别处 | 端点变了，改用方式 2 |
+
+> 📌 **本机实测记录（2026-10-29 23:35）**：从本机访问该端点返回 `429`。
+> 所以方式 1 **在本环境下不能作为判据**，请优先用方式 2（贴真实平台）。
+> 写在这里是为了避免下一个人看到 429 就以为 Social preview 配错了。
+
+> ⚠️ 这个端点有缓存（`Cache-Control` 较长），**设置后可能几分钟到几小时才更新**。
+> 如果刚才才上传，先等 5 分钟再试。
+
+#### 方式 2：贴到真实平台（最可信，但要手动）
+
+**这是唯一能 100% 确认的方式**，因为每个平台的抓取器行为不同：
+
+| 平台 | 操作 | 期望 |
+|---|---|---|
+| **Slack** | 在任意频道粘贴 `https://github.com/tbj0623/decision-arena-lab` 并发送 | 消息下方展开卡片，缩略图是你的图 |
+| **Twitter/X** | 发一条仅自己可见的推文，粘贴链接 | 链接预览图是品牌图 |
+| **Telegram** | 发给「Saved Messages」 | 同上 |
+| **Discord** | 粘贴到任意频道 | 同上 |
+
+> **微信不支持标准 OG 抓取**，不要用微信验证——它会显示自己的降级样式，不能作为判据。
+
+#### 方式 3：Facebook / LinkedIn 调试器（可强制刷新缓存）
+
+```text
+https://developers.facebook.com/tools/debug/
+→ 输入 https://github.com/tbj0623/decision-arena-lab
+→ 点 "Scrape Again"（强制重新抓取，绕过缓存）
+```
+
+或：
+
+```text
+https://www.linkedin.com/post-inspector/
+→ 输入仓库链接 → Inspect
+```
+
+这两个工具会**明确列出它抓到的 og:image URL**，比肉眼看卡片更可靠。
+
+#### 验证通过的判据（三条全中才算生效）
+
+- [ ] 外部抓取器返回的 `og:image` 指向 `github.com/...` 的 OG 图，**不是** `avatars.githubusercontent.com` 默认图
+- [ ] 实际渲染出来的卡片图片是**品牌图**（深色背景 + 产品名），不是 GitHub 默认灰卡
+- [ ] 至少 **2 个不同平台**都显示正确（单平台可能是个例缓存）
+
+> **如果你只做了 Settings 里的上传、没做上面的验证，就还不能说"Social preview 已设置好"。**
+> 上传是动作，生效是结果，两者之间隔着 CDN 缓存。
+
 ---
 
 ## 5. 其他建议（可选）
