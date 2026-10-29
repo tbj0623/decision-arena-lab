@@ -1977,3 +1977,20 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
   color: var(--accent);
   font-weight: 600;
 }
+
+/* --------------------------------------------------------------------------
+   首屏免责声明在 360×780 下溢出 2px（QA 的 P2，v1.0 遗留）
+   --------------------------------------------------------------------------
+   实测：.notice-warn 的 bottom = 782，视口高 780，最后一行被折叠线切掉。
+   用户必须滚动才能读完"本工具只能帮你列要素"这句——而那正是
+   产品最需要被读到的一句话（它说明边界在哪）。
+
+   修法只用「收紧留白」而不是删文案：把 hero 底部内边距从 20px 收到 12px，
+   再把这句的行高从 1.68 收到 1.6。两处合计省下约 8px，留出余量。
+   不动字号（可读性优先），不动文案（一个字都不能少）。
+   验证：360×780 下 bottom 必须 <= 780。 */
+@media (max-height: 820px) and (max-width: 420px) {
+  .hero { padding-block: clamp(1.6rem, 5vw, 2.4rem) 12px; }
+  .notice-warn { line-height: 1.6; }
+  .notice-warn { padding-block: 12px; }
+}
