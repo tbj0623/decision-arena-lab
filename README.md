@@ -49,6 +49,10 @@
 
 ![结果区](docs/screenshots/04-desktop-result-flip.png)
 
+**九个虚构示例**（覆盖职业 / 消费 / 居住 / 升学 / 断舍离 / 关系 / 生活）：
+
+![九个虚构示例](docs/screenshots/09-nine-examples.png)
+
 </details>
 
 ---

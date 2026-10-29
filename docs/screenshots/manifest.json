@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-29T15:34:33.361Z",
-  "commit": "8102f776221e3b57b23751f5ea3055c6885bfc0b",
+  "generatedAt": "2026-10-29T16:20:40.830Z",
+  "commit": "2a0a3b9216248ed782df07af7f2bd86b74e70896",
   "baseUrl": "http://127.0.0.1:8099/  (本地静态服务器，服务的就是 site/ 目录这份代码)",
   "note": "真实浏览器（Playwright Chromium）从本地真实运行的页面截取，读的就是 site/ 目录。未使用设计原型或 AI 生成图。",
   "shots": [
@@ -9,21 +9,21 @@
       "name": "desktop-hero-light",
       "viewport": "1440×900",
       "theme": "light",
-      "commit": "8102f776221e3b57b23751f5ea3055c6885bfc0b"
+      "commit": "2a0a3b9216248ed782df07af7f2bd86b74e70896"
     },
     {
       "file": "docs/screenshots/02-desktop-hero-dark.png",
       "name": "desktop-hero-dark",
       "viewport": "1440×900",
       "theme": "dark",
-      "commit": "8102f776221e3b57b23751f5ea3055c6885bfc0b"
+      "commit": "2a0a3b9216248ed782df07af7f2bd86b74e70896"
     },
     {
       "file": "docs/screenshots/03-desktop-hero-tie.png",
       "name": "desktop-hero-tie",
       "viewport": "1440×900",
       "theme": "light",
-      "commit": "8102f776221e3b57b23751f5ea3055c6885bfc0b"
+      "commit": "2a0a3b9216248ed782df07af7f2bd86b74e70896"
     },
     {
       "file": "docs/screenshots/04-desktop-result-flip.png",
@@ -31,7 +31,7 @@
       "viewport": "1440×900",
       "theme": "light",
       "scrollTo": "#result-card",
-      "commit": "8102f776221e3b57b23751f5ea3055c6885bfc0b",
+      "commit": "2a0a3b9216248ed782df07af7f2bd86b74e70896",
       "selfCheck": {
         "resultVisible": true,
         "hasScores": true,
@@ -47,7 +47,7 @@
       "viewport": "1440×1200",
       "theme": "light",
       "scrollTo": "#workspace",
-      "commit": "8102f776221e3b57b23751f5ea3055c6885bfc0b",
+      "commit": "2a0a3b9216248ed782df07af7f2bd86b74e70896",
       "selfCheck": {
         "resultVisible": true,
         "hasScores": true,
@@ -63,14 +63,14 @@
       "viewport": "375×812",
       "theme": "light",
       "fullPage": true,
-      "commit": "8102f776221e3b57b23751f5ea3055c6885bfc0b"
+      "commit": "2a0a3b9216248ed782df07af7f2bd86b74e70896"
     },
     {
       "file": "docs/screenshots/07-mobile-hero-390.png",
       "name": "mobile-hero-390",
       "viewport": "390×844",
       "theme": "light",
-      "commit": "8102f776221e3b57b23751f5ea3055c6885bfc0b"
+      "commit": "2a0a3b9216248ed782df07af7f2bd86b74e70896"
     },
     {
       "file": "docs/screenshots/08-mobile-result.png",
@@ -78,7 +78,7 @@
       "viewport": "390×844",
       "theme": "light",
       "scrollTo": "#result-card",
-      "commit": "8102f776221e3b57b23751f5ea3055c6885bfc0b",
+      "commit": "2a0a3b9216248ed782df07af7f2bd86b74e70896",
       "selfCheck": {
         "resultVisible": true,
         "hasScores": true,
@@ -87,6 +87,15 @@
           "63.6"
         ]
       }
+    },
+    {
+      "file": "docs/screenshots/09-nine-examples.png",
+      "name": "nine-examples",
+      "viewport": "1440×1000",
+      "theme": "light",
+      "fullPage": false,
+      "commit": "2a0a3b9216248ed782df07af7f2bd86b74e70896",
+      "note": "九个虚构示例的总览。点任一卡片即可载入到工作区。"
     }
   ],
   "commitNote": "commit 字段记录的是生成时的本地 HEAD，只用于标识「哪一次本地快照」。本机 github.com:443 被阻断，git fetch 不可用，本地历史与远端历史没有连通，所以这个本地 SHA 不对应任何远端 commit —— 这不是错误，是这套环境的事实。判断「截图内容 == 线上内容」请看 sha256 逐文件核对（见 ops/qa/V9_ACCEPTANCE.md），而不是比对 commit SHA。",
