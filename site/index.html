@@ -142,7 +142,14 @@
           <output for="hero-slider" id="hero-slider-out">—</output>
           <input type="range" id="hero-slider" min="0" max="100" step="any" value="50">
         </div>
-        <p class="hero-demo-verdict" id="hero-verdict" role="status" aria-live="polite">正在计算…</p>
+        <!-- 视觉判定行：**不**带 aria-live（原因见下） -->
+        <p class="hero-demo-verdict" id="hero-verdict">正在计算…</p>
+        <!-- 独立播报区（sr-only）：只在松手时写入。
+             为什么不直接在上一行挂 aria-live：
+             拖动中它每帧都在变（会刷屏），而松手时文字又和最后一帧完全相同
+             （textContent 写同值不产生 DOM 变更）→ 读屏永远收不到。
+             拆成独立区域后，写入前先清空，强制产生一次变更。 -->
+        <p class="sr-only" id="hero-verdict-live" role="status" aria-live="polite"></p>
         <p class="hero-demo-caveat">
           以上数字由你在这里拖动的位置实时算出，公式与工作区完全相同。它显示的是
           <strong>你给的评分和权重</strong>之间的关系，不是对未来结果的预估。

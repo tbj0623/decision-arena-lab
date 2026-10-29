@@ -1488,13 +1488,10 @@ function initHeroDemo() {
     // 这样屏幕上永远自洽，读屏也不会被刷屏。
     // 靠"拍摄纪律"防不住这个 —— 只要有任何第二个素材（截图、录屏、别人自己用），
     // 这个瞬间就会被反复撞上。只能改代码。
-    const liveRegion = verdict.closest('[aria-live]') || verdict;
-    if (!announce) {
-      // 拖动中：更新视觉，但临时把 aria-live 摘掉，避免读屏刷屏
-      liveRegion.setAttribute('aria-live', 'off');
-    } else {
-      liveRegion.setAttribute('aria-live', 'polite');
-    }
+    // 视觉与播报彻底分家（见 index.html 里的注释）：
+    //   #hero-verdict       只负责视觉，永远跟着更新
+    //   #hero-verdict-live  sr-only 播报区，只在松手（announce=true）时写入
+    // 这样拖动中不会刷屏，松手时一定播报 —— 即使句子和上一帧一模一样。
 
     // 「打平」的判据必须和**显示的差值**一致。
     //
@@ -1529,6 +1526,21 @@ function initHeroDemo() {
       const leading = projected.difference > 0 ? optA.label : optB.label;
       verdict.textContent = `此刻更倾向「${leading}」，差 ${fmt1(diff)} 分。`;
       verdict.dataset.state = 'lead';
+    }
+
+    // 只在松手时播报。先清空、下一帧再写 —— **强制产生 DOM 变更**。
+    // 不这么做的话：松手时的句子与拖动末帧完全相同，
+    // textContent 写同值不会触发 live 事件，读屏用户永远听不到结论。
+    if (announce) {
+      const live = document.querySelector('#hero-verdict-live');
+      if (live) {
+        live.textContent = '';
+        const sentence = verdict.textContent;
+        requestAnimationFrame(() => {
+          // 防御：万一这之间又拖了，只播最新那句
+          if (!live.textContent) live.textContent = sentence;
+        });
+      }
     }
   }
 

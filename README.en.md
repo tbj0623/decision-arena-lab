@@ -147,7 +147,7 @@ node scripts/check-no-network.mjs  # verify "zero external requests / zero persi
 | Storage | **No** `localStorage` / `sessionStorage` / cookies / IndexedDB |
 | Network | **Zero external requests** at runtime, checked automatically by `scripts/check-no-network.mjs` |
 | Computation | [`site/core.mjs`](site/core.mjs) — dependency-free pure functions, with input validation and stable error codes |
-| Tests | `node --test` (no arguments). The suite is about 211 tests and covers the math's edge cases, the UI contract, and the zero-network and security audits. **The exact pass count comes from your own run** — this project is still in motion, so the docs don't hard-code a number; if anything fails, go by the `node --test` output and open an issue |
+| Tests | `node --test` (no arguments). Covers the math's edge cases, the UI contract, the accessibility contract, and the zero-network and security audits. **The docs deliberately don't hard-code a test count** — it changes daily, so any number here would go stale; go by the `node --test` output, and open an issue if anything fails |
 | Deployment | GitHub Pages (`.github/workflows/pages.yml`) |
 | Export | Generates a JSON file locally in your browser, never through a server |
 

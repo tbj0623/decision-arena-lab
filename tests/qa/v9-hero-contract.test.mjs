@@ -74,11 +74,33 @@ test('V9 首屏：滑杆是连续的（step=any），能拖到精确临界点', 
   assert.ok(slider.includes('type="range"'), '必须是 range 控件');
 });
 
-test('V9 首屏：判定文案有 aria-live，但不会每帧播报', () => {
-  const verdict = HTML.match(/<p[^>]*id="hero-verdict"[^>]*>/)?.[0] || '';
-  assert.ok(verdict.includes('aria-live="polite"'), '判定文案需要 aria-live');
-  assert.ok(verdict.includes('role="status"'), '判定文案需要 role=status');
-  // 滑杆的 input 事件里不应直接写 aria-live="assertive"（会打断读屏）
+test('V9 首屏：判定文案有独立的 aria-live 播报区，且不会每帧播报', () => {
+  // 2026-10-30 修改：原来断言「aria-live 挂在 #hero-verdict 上」，
+  // 但那个设计有个只有用 UIA 数事件才发现的缺陷：
+  // 松手（change）时重算出的值与拖动末帧完全相同，textContent 写同值
+  // 不产生 DOM 变更 → 鼠标用户**永远听不到结论句**，只听到一串裸百分比。
+  //
+  // 现在的设计：视觉行和播报区**彻底分开**
+  //   #hero-verdict      只负责视觉，不带 aria-live
+  //   #hero-verdict-live sr-only 独立播报区，只在 change 时「先清空再写」强制变更
+  // 这条测试守住**意图**（有播报区、不刷屏、不用 assertive），不锁死的那个写法。
+  const visual = HTML.match(/<p[^>]*id="hero-verdict"[^>]*>/)?.[0] || '';
+  const liveRegion = HTML.match(/<p[^>]*id="hero-verdict-live"[^>]*>/)?.[0] || '';
+
+  assert.ok(liveRegion, '必须有独立的 #hero-verdict-live 播报区');
+  assert.ok(liveRegion.includes('aria-live="polite"'), '播报区需要 aria-live="polite"');
+  assert.ok(liveRegion.includes('role="status"'), '播报区需要 role=status');
+  assert.ok(liveRegion.includes('sr-only'), '播报区必须视觉隐藏（sr-only），否则用户会看到重复文字');
+
+  // 视觉行不该再带 aria-live —— 它每帧都变，挂了就会刷屏
+  assert.ok(!visual.includes('aria-live'), '#hero-verdict 不该再带 aria-live（会每帧刷屏）');
+
+  // 播报只发生在 change（announce=true）路径上
+  assert.match(APP, /if \(announce\)[\s\S]{0,400}hero-verdict-live/,
+    '播报必须由 change（announce）触发，而不是每帧');
+  // 强制 DOM 变更的写法必须在（先清空）
+  assert.match(APP, /live\.textContent = ''/, '写入前必须先清空，否则同值不触发 live 事件');
+
   assert.ok(!APP.includes('aria-live="assertive"'), '不得使用 assertive，会打断读屏');
 });
 

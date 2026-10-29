@@ -140,7 +140,7 @@ node scripts/check-no-network.mjs  # 核验"零外部请求 / 零持久化"
 | 存储 | **不使用** `localStorage` / `sessionStorage` / Cookie / IndexedDB |
 | 网络 | 运行时**零外部请求**，可由 `scripts/check-no-network.mjs` 自动核验 |
 | 计算 | [`site/core.mjs`](site/core.mjs) — 零依赖纯函数，含输入校验与稳定错误码 |
-| 测试 | `node --test`（无参数）。测试套件约 **211 项**，覆盖数学边界、UI 契约、零网络与安全审计。**具体通过数以你本地运行为准**——本项目仍在迭代，不在文档里写死数字；若出现失败，请以 `node --test` 输出为准并提 Issue |
+| 测试 | `node --test`（无参数）。覆盖数学边界、UI 契约、无障碍契约、零网络与安全审计。**本项目不在文档里写死测试数量** —— 它每天都在变，写死必然过期；请以 `node --test` 的输出为准，若出现失败请提 Issue |
 | 部署 | GitHub Pages（`.github/workflows/pages.yml`） |
 | 导出 | 生成 JSON 文件，浏览器本地完成，不经任何服务器 |
 
