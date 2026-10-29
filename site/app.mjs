@@ -333,40 +333,45 @@ function makeRatingRow(factor, side) {
       e.target.removeAttribute('aria-invalid');
       e.target.removeAttribute('aria-describedby');
       clearError();
-      // ── 防抖：停止输入 260ms 后才提交 ──
+      // ── 提交时机：只改"确认后才生效"，不用防抖毫秒数 ──
       //
-      // 为什么必须防抖（我上一版只做"非法值不写入"，没堵住根因）：
-      //   用户想输 `10`（合法值）时，第一下敲的 `1` **也是合法值**，
-      //   于是立刻被提交 → 分数从 9 分滑到 1 分 → 再敲 `0` 才变成 10。
-      //   中间那一瞬间的分数、贡献表、翻转列表、导出内容全是错的。
-      //   实测：载入 offer 后敲 `10`，分数先跳到 42.1 再回到 70.7+。
-      //   如果用户在这一瞬间点了导出，写进文件的就是 1。
+      // 历史缺陷（最终验收发现，260/270/300/400ms 间隔全部失败）：
+      // 我上一版用 260ms 防抖，理由是"人类打字间隔 80–200ms"。
+      // **这个前提是错的** —— 实测人类正常打字 150–300ms/键。
+      // 于是输 "11" 时：第一下 "1" 在 260ms 后被提交（70.7→42.1），
+      // 第二下 "1" 拼成非法值，失焦回滚成 1 —— 而用户从未输入过 1。
       //
-      // 260ms 是"人打字间隔"与"响应快感"的折中：
-      //   · 正常打字两键间隔 80–200ms → 不会中途提交
-      //   · 停手后 260ms 必定提交 → 不会让人觉得卡
-      // 用 change（失焦）+ 防抖双保险：失焦时立即提交，不等 260ms。
-      const target = e.target;
-      if (target._ratingTimer) clearTimeout(target._ratingTimer);
-      target._ratingTimer = setTimeout(() => {
-        target._ratingTimer = null;
-        // 再读一次：防抖窗口内可能又变了，也可能已经失焦回滚
-        const now = Number(target.value);
-        if (target.value === '' || !Number.isFinite(now) || now < 0 || now > 10) return;
-        if (!Number.isInteger(now * 2)) return;
-        factor.ratings[side] = now;
-        scheduleRecalc();
-      }, 260);
+      // 根因不是毫秒数不够大，而是**思路错了**：
+      // 只要有"未确认的编辑"，就不该提交。
+      //
+      // 修法：oninput 只校验 + 标记，**完全不改 factor.ratings、不重算**；
+      // 提交只发生在 change（失焦 / 回车）。
+      // 这是数字输入框的标准语义 —— 确认后生效。
+      // 加号减号（bumpRating）是明确点击，仍立即生效。
+      e.target.dataset.dirty = '1';
     },
-    // 失焦：取消待提交的防抖，立即按最终值提交（或回滚）
+    // 失焦 / 回车：这里才提交（或回滚）
     onchange: (e) => {
       const target = e.target;
-      if (target._ratingTimer) { clearTimeout(target._ratingTimer); target._ratingTimer = null; }
-      const num = Number(target.value);
-      if (target.value !== '' && Number.isFinite(num) && num >= 0 && num <= 10 && Number.isInteger(num * 2)) {
+      const raw = target.value;
+      const num = Number(raw);
+
+      // 合法：写入并重算
+      if (raw !== '' && Number.isFinite(num) && num >= 0 && num <= 10 && Number.isInteger(num * 2)) {
         factor.ratings[side] = num;
+        target.removeAttribute('aria-invalid');
+        target.removeAttribute('aria-describedby');
+        delete target.dataset.dirty;
+        clearError();
         scheduleRecalc();
+        return;
       }
+      // 不合法 / 空：回滚到上一次**确认过**的值（也就是 factor.ratings 里的）
+      target.value = String(factor.ratings[side]);
+      target.removeAttribute('aria-invalid');
+      target.removeAttribute('aria-describedby');
+      delete target.dataset.dirty;
+      clearError();
     },
     onblur: (e) => {
       // 回滚统一在这里做：空值、以及任何非法值，都恢复成"真正参与计算的那个数"。
@@ -1015,8 +1020,9 @@ function buildFlipSlider(flip) {
     //
     // 现在：先算出"用户真正看到的那个数"，用它判断打平。
     // 显示成 0.0 就必须说打平；显示成 0.1 就不许说打平。
-    const shownAbs = Math.abs(Number(fmt1(absDiff)));
-    const isTie = shownAbs === 0;
+    // 同源修复（见首屏那段注释）：判据必须和"两个显示出来的分数"一致，
+    // 否则会出现「A 66.0 / B 66.1，两边打平（差 0.0）」这种自相矛盾的句子。
+    const isTie = fmt1(projected.scoreA) === fmt1(projected.scoreB);
     if (isTie) verdictText = '两边打平';
     else if (projected.difference > 0) verdictText = analysisLabel('A');
     else verdictText = analysisLabel('B');
@@ -1501,8 +1507,20 @@ function initHeroDemo() {
     //      界面却把差值四舍五入显示成「0.0」。显示 0.0 就必须说打平，不能自相矛盾。
     //
     // 所以统一用「显示出来的那个数」做判据 —— 和工作区滑杆用的是同一个规则。
-    const shownDiff = Number(fmt1(diff));
-    const isTie = shownDiff === 0;
+    /* ===== 打平判据：显示字符串相等（P0 修复）===== */
+    //
+    // 历史缺陷（最终验收发现，8/41 个采样点必现）：
+    // 原来判据是"差值的 1 位小数是 0"（fmt1(|Δ|) === "0.0"），
+    // 但分数是**各自**四舍五入展示的。
+    // Δ=0.017~0.063 时：差值显示 0.0（判打平），
+    // 而 66.05 显示 66.1、65.98 显示 66.0 —— 屏幕上两个数字不相等却说打平。
+    // 实测 39.32~39.34% 和 39.42~39.46% 都会这样。
+    //
+    // 修法：判据改成"两个**显示出来的字符串**相等"。
+    // 这样"说打平" ⇔ "屏幕上两个数字一样"，永远不可能自相矛盾。
+    const shownA = fmt1(projected.scoreA);
+    const shownB = fmt1(projected.scoreB);
+    const isTie = shownA === shownB;
 
     if (isTie) {
       verdict.textContent = '两个方案打平了——这是最容易被撬动的时刻。';
