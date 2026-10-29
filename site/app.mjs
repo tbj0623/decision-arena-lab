@@ -312,8 +312,40 @@ function makeRatingRow(factor, side) {
       e.target.removeAttribute('aria-invalid');
       e.target.removeAttribute('aria-describedby');
       clearError();
-      factor.ratings[side] = num;
-      scheduleRecalc();
+      // ── 防抖：停止输入 260ms 后才提交 ──
+      //
+      // 为什么必须防抖（我上一版只做"非法值不写入"，没堵住根因）：
+      //   用户想输 `10`（合法值）时，第一下敲的 `1` **也是合法值**，
+      //   于是立刻被提交 → 分数从 9 分滑到 1 分 → 再敲 `0` 才变成 10。
+      //   中间那一瞬间的分数、贡献表、翻转列表、导出内容全是错的。
+      //   实测：载入 offer 后敲 `10`，分数先跳到 42.1 再回到 70.7+。
+      //   如果用户在这一瞬间点了导出，写进文件的就是 1。
+      //
+      // 260ms 是"人打字间隔"与"响应快感"的折中：
+      //   · 正常打字两键间隔 80–200ms → 不会中途提交
+      //   · 停手后 260ms 必定提交 → 不会让人觉得卡
+      // 用 change（失焦）+ 防抖双保险：失焦时立即提交，不等 260ms。
+      const target = e.target;
+      if (target._ratingTimer) clearTimeout(target._ratingTimer);
+      target._ratingTimer = setTimeout(() => {
+        target._ratingTimer = null;
+        // 再读一次：防抖窗口内可能又变了，也可能已经失焦回滚
+        const now = Number(target.value);
+        if (target.value === '' || !Number.isFinite(now) || now < 0 || now > 10) return;
+        if (!Number.isInteger(now * 2)) return;
+        factor.ratings[side] = now;
+        scheduleRecalc();
+      }, 260);
+    },
+    // 失焦：取消待提交的防抖，立即按最终值提交（或回滚）
+    onchange: (e) => {
+      const target = e.target;
+      if (target._ratingTimer) { clearTimeout(target._ratingTimer); target._ratingTimer = null; }
+      const num = Number(target.value);
+      if (target.value !== '' && Number.isFinite(num) && num >= 0 && num <= 10 && Number.isInteger(num * 2)) {
+        factor.ratings[side] = num;
+        scheduleRecalc();
+      }
     },
     onblur: (e) => {
       // 回滚统一在这里做：空值、以及任何非法值，都恢复成"真正参与计算的那个数"。
