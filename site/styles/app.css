@@ -3015,3 +3015,111 @@ main:focus:not(:focus-visible) {
   .rating-row > .rating-error { width: 100%; }
 }
 .stepper input[type="number"] { min-width: 2.6ch; }
+
+
+/* --------------------------------------------------------------------------
+   首屏「跳到打平点」按钮（跨浏览器审计 F1）
+   --------------------------------------------------------------------------
+   为什么需要它：WebKit 的 pointermove clientX 全是整数 → 拖动落点步长 0.2364%，
+   而打平窗口只有 0.07%（约 0.3px），窗口夹在两个可达落点之间，
+   最近也差 0.06px → **WebKit 用户拖不出打平**。鼠标用户同样难。
+   工作区早有「跳到精确临界点」，首屏补一个按钮，两处行为一致。
+
+   配色在 hero 深色带里，必须用 --hero-* 令牌，不能沿用浅色页面的按钮色，
+   否则会出现"深底 + 深字"看不见（这是 v9.18 打印态踩过的同类坑）。
+   -------------------------------------------------------------------------- */
+.hero-demo-jump {
+  margin-top: .5rem;
+  padding: .35rem .7rem;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--hero-mint, #5ce8c3);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--hero-mint, #5ce8c3) 45%, transparent);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  align-self: flex-start;
+  transition: background .15s ease, border-color .15s ease;
+}
+.hero-demo-jump:hover {
+  background: color-mix(in srgb, var(--hero-mint, #5ce8c3) 14%, transparent);
+  border-color: var(--hero-mint, #5ce8c3);
+}
+.hero-demo-jump:focus-visible {
+  outline: 2px solid var(--hero-mint, #5ce8c3);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-demo-jump { transition: none; }
+}
+@media (forced-colors: active) {
+  .hero-demo-jump { border-color: CanvasText; color: CanvasText; }
+}
+
+/* ===== 强制高对比：首屏交还系统（极端环境审计修复）===== */
+@media (forced-colors: active) {
+  /* 1) 先把首屏整棵子树交还系统。
+        之前是给容器设 forced-color-adjust: none —— 那会继承，
+        等于把整棵子树的兜底改色全关掉。 */
+  .hero,
+  .hero *,
+  .hero-demo,
+  .hero-demo * {
+    forced-color-adjust: auto;
+  }
+
+  /* 2) 只给纯装饰色块留豁免：它们的意义靠位置/形状，不靠颜色。 */
+  .hero-demo-dot,
+  .hero-demo-bar > i,
+  .hero-demo-bar > span,
+  .hero-fact-dot,
+  .demo-bar > i,
+  .bar-fill,
+  .bar-track::after {
+    forced-color-adjust: none;
+  }
+
+  /* 3) 补掉原来被特异性压回去的后代选择器。
+        审计实测这 11 个元素是近白/薄荷压在 Canvas 白上（1.07~1.70:1），
+        这里逐个显式钉成系统色，不依赖继承。 */
+  .hero-demo-caveat,
+  .hero-demo-caveat strong,
+  .hero-demo-verdict,
+  .hero-demo-verdict[data-state],
+  .hero-demo-verdict[data-state="lead"],
+  .hero-demo-verdict[data-state="tie"],
+  .hero-demo-score[data-side] .hero-demo-score-label,
+  .hero-demo-score[data-side] .hero-demo-score-num,
+  .hero em,
+  .hero summary,
+  .hero strong,
+  .hero h1,
+  .hero .lede {
+    color: CanvasText !important;
+  }
+
+  /* 4) 背景一律交还系统（深海军蓝在强制色下应变成 Canvas，
+        否则会出现"白底 + 浅字"或反过来"深底 + 系统深字"）。 */
+  .hero,
+  .hero-demo {
+    background: Canvas;
+    border-color: CanvasText;
+  }
+
+  /* 「LIVE」徽章带文字，不是纯装饰 —— 必须显式给系统色。
+     第一版把它和其他装饰一起豁免并置成 Canvas 背景，
+     结果白字压白底（对比度 1:1），实测被脚本抓出来。
+     现在改成：Canvas 底 + CanvasText 字 + CanvasText 描边，靠边框表达"是个标签"。 */
+  .hero-demo-badge {
+    color: CanvasText !important;
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+
+  /* 5) 焦点环在强制色下要用 Highlight，否则可能和背景同色看不见。 */
+  .hero :focus-visible {
+    outline-color: Highlight;
+  }
+}
+

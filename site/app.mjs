@@ -1031,7 +1031,8 @@ function buildFlipSlider(flip) {
     live.append(
       el('span', { text: `权重占比 ${pct(t, 2)}${near}：` }),
       el('strong', { text: `A ${fmt1(projected.scoreA)} / B ${fmt1(projected.scoreB)}` }),
-      el('span', { text: `，${verdictText}（差 ${fmt1(absDiff)}）` }));
+      // 同源修复（见首屏注释）：差值用两个**显示出来的**分数相减
+    el('span', { text: `，${verdictText}（差 ${Math.abs(Number(fmt1(projected.scoreA)) - Number(fmt1(projected.scoreB))).toFixed(1)}）` }));
     return projected;
   };
 
@@ -1524,7 +1525,13 @@ function initHeroDemo() {
       verdict.dataset.state = 'tie';
     } else {
       const leading = projected.difference > 0 ? optA.label : optB.label;
-      verdict.textContent = `此刻更倾向「${leading}」，差 ${fmt1(diff)} 分。`;
+      // 差值必须和两个分数**同源**（跨浏览器审计 F2）。
+      // 原来用未取整的真实差值 fmt1(diff)：A 显示 66.1、B 显示 66.0，
+      // 差值却是 0.0 → 屏幕上「更倾向 X，差 0.0 分」自相矛盾。
+      // 现在用两个**显示出来的数字**相减：66.1 − 66.0 = 0.1。
+      // 于是「差 0.0」当且仅当「两个分数相等」，与打平判据完全一致。
+      const diffShown = Math.abs(Number(shownA) - Number(shownB)).toFixed(1);
+      verdict.textContent = `此刻更倾向「${leading}」，差 ${diffShown} 分。`;
       verdict.dataset.state = 'lead';
     }
 
@@ -1541,6 +1548,23 @@ function initHeroDemo() {
           if (!live.textContent) live.textContent = sentence;
         });
       }
+    }
+  }
+
+  // 「跳到打平点」：解决"拖不到打平窗口"（跨浏览器审计 F1）
+  const jumpBtn = $('#hero-jump-tie');
+  if (jumpBtn) {
+    if (highlight && Number.isFinite(highlight.thresholdShare)) {
+      jumpBtn.hidden = false;
+      jumpBtn.addEventListener('click', () => {
+        slider.value = String(highlight.thresholdShare * 100);
+        // 先 input（刷新视觉）再 change（触发播报），模拟一次真实的"拖到并松手"
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+        slider.dispatchEvent(new Event('change', { bubbles: true }));
+        slider.focus();
+      });
+    } else {
+      jumpBtn.hidden = true;
     }
   }
 

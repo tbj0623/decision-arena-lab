@@ -102,6 +102,19 @@ test('UI 说"打平"时，两个显示出来的分数必须相等（不打平则
       if (!saysTie && r.a === r.b) {
         contradictions.push({ pct: pct.toFixed(2), a: r.a, b: r.b, why: '分数相等却说没打平' });
       }
+      // 判据：文案里的「差 X」必须等于两个**显示出来的**分数之差。
+      // （跨浏览器审计 F2：之前文案用未取整的真实差值，
+      //   出现「更倾向 X，差 0.0 分」而分数是 66.1/66.0 —— 同屏自相矛盾。）
+      const m = r.text.match(/差\s*([\d.]+)\s*分/);
+      if (!saysTie && m) {
+        const expect = Math.abs(Number(r.a) - Number(r.b)).toFixed(1);
+        if (m[1] !== expect) {
+          contradictions.push({
+            pct: pct.toFixed(2), a: r.a, b: r.b,
+            why: `差值不同源：文案"差 ${m[1]}"，两个显示分数相减是 ${expect}`,
+          });
+        }
+      }
     }
 
     assert.deepEqual(
