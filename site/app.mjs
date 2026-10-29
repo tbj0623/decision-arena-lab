@@ -1013,6 +1013,21 @@ function buildFlipSlider(flip) {
   const out = el('output', { for: sliderId, text: pct(flip.currentShare, 2) });
 
   block.append(
+    // 「这是演示」的标识必须显式给出来（首次触达走查 B-1）。
+    //
+    // 原来这里只有一句"亲手拨一下"，用户会以为拖动它等于修改自己的方案 ——
+    // 而它其实是**只读的投影**（改的是 t，不是 state）。
+    // 拖到 62.94% 时演示区说 B 领先 15.5，上方结果卡还是 A 领先 7.1，
+    // 同一屏两个互斥结论而页面不解释 → 用户会认为工具算错了。
+    //
+    // 两种解法：① 标清"演示"；② 让它真的驱动真实权重。
+    // 我两个都做了：
+    //   · 这里加清晰的"预览"标识
+    //   · 「跳到精确临界点」按钮现在会真写 state（见下面 onclick）
+    el('p', { class: 'flip-preview-tag' },
+      el('span', { class: 'flip-preview-dot', 'aria-hidden': 'true' }),
+      el('span', {}, '预览：这一条只影响下面这张卡，不会改动你上面填的方案'),
+    ),
     el('label', { for: sliderId },
       el('span', {}, '亲手拨一下：把「', el('strong', { text: flip.label }), '」的权重占比拖到 ',
         pct(flip.thresholdShare, 2), ' 附近看看')),

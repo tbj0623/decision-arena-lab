@@ -2872,3 +2872,38 @@ main:focus:not(:focus-visible) {
     forced-color-adjust: none;
   }
 }
+
+/* 翻转演示区的「预览」标识（首次触达走查 B-1）
+   不加这个，用户会以为拖那根滑杆等于改自己的方案 —— 而它其实是只读投影。
+   拖到 62.94% 时演示区说 B 领先 15.5、上方结果卡说 A 领先 7.1，
+   同一屏两个互斥结论而不解释，用户会认为工具算错了。 */
+.flip-preview-tag {
+  display: flex;
+  align-items: center;
+  gap: .4em;
+  margin: 0 0 .5rem;
+  padding: .35rem .55rem;
+  font-size: .78rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: var(--radius-xs);
+}
+.flip-preview-dot {
+  flex: 0 0 auto;
+  width: .5em; height: .5em;
+  border-radius: 50%;
+  background: var(--accent);
+}
+@media (prefers-contrast: more) {
+  .flip-preview-tag {
+    background: var(--bg-sunk);
+    border-color: var(--ink);
+    color: var(--ink);
+  }
+}
+@media (forced-colors: active) {
+  .flip-preview-tag { border-color: CanvasText; color: CanvasText; background: Canvas; }
+  .flip-preview-dot { background: CanvasText; }
+}
