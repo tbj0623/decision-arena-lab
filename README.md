@@ -1,3 +1,5 @@
+[中文](README.md) | [English](README.en.md)
+
 <div align="center">
 
 ![反悔雷达 · Decision Arena — 改变一个条件，看清一次选择](docs/assets/readme-cover.png)

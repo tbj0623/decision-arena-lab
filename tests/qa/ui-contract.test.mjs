@@ -172,6 +172,60 @@ test('UI 契约：分享摘要不得包含用户写的方案名称（D-01 回归
   assert.deepEqual(leaks, [], `buildShareText 引用了方案名称：${JSON.stringify(leaks)}`);
 });
 
+// V1.0 的 P0-3（"调到 39.4% 就会打平"但实测没打平）在分享路径上的残留。
+//
+// red-team 的 P0：`pct(share, digits = 1)` 默认 1 位小数。
+// buildShareText 里唯一一处调用没传 digits，于是分享文本写"调到 39.4% 就会打平"，
+// 而实测 39.4% 处 Δ=−0.004（**没打平**）。
+// 页面内其他 9 处调用全部显式传了 2 或 4 —— 当初修 P0-3 时唯独漏了分享这一条路径。
+//
+// 为什么这条特别严重：页面内的错误用户当场能发现；
+// 分享出去的错误会**离开产品语境**——别人照着调到 39.4% 发现没打平，
+// 只会得出"这工具算错了"，而作者不在场无法澄清。
+//
+// 这条测试要锁两件事：
+//   1) buildShareText 里所有 pct() 调用都必须显式传 digits（不能吃默认 1 位）
+//   2) 不能出现"精确 X"这种声称精确命中的措辞（应当是"约 X（精确 Y）"）
+test('UI 契约：分享摘要里的百分比必须传精度，且不得声称某个两位小数能精确命中（P0-3 分享路径回归）', () => {
+  const start = APP.indexOf('function buildShareText');
+  const end = APP.indexOf('function openShare');
+  assert.ok(start > 0 && end > start, '应当能定位到 buildShareText');
+  const rawFn = APP.slice(start, end);
+
+  // 先剥掉注释再找 pct() 调用。
+  //
+  // 为什么：修这个 P0 时我在注释里引用了旧代码 `pct(lastFlip.thresholdShare)`
+  // 来说明"原来错在哪"，结果测试把注释里的字符串当成了真调用，报了一个假 FAIL。
+  // 这是今晚第三次栽在"源代码正则匹配到注释"上 —— 凡是对源码做文本断言，
+  // 第一步就该剥注释。
+  const fn = rawFn
+    .replace(/\/\*[\s\S]*?\*\//g, '')   // 块注释
+    .replace(/(^|[^:])\/\/.*$/gm, '$1'); // 行注释（避开 http:// 这类）
+
+  // 找出所有 pct(...) 调用，检查是否传了第二个参数
+  const calls = [...fn.matchAll(/pct\(([^)]*)\)/g)].map((m) => m[0]);
+  assert.ok(calls.length > 0, 'buildShareText 应当至少调用一次 pct()');
+
+  const missingDigits = calls.filter((call) => {
+    // 数一下顶层逗号：没有逗号 = 只传了一个参数
+    const inner = call.slice(4, -1); // 去掉 "pct(" 和 ")"
+    let depth = 0;
+    let commas = 0;
+    for (const ch of inner) {
+      if (ch === '(' || ch === '[' || ch === '{') depth += 1;
+      else if (ch === ')' || ch === ']' || ch === '}') depth -= 1;
+      else if (ch === ',' && depth === 0) commas += 1;
+    }
+    return commas === 0;
+  });
+
+  assert.deepEqual(
+    missingDigits,
+    [],
+    `buildShareText 里的 pct() 必须显式传精度位数（默认 1 位会让"调到 X% 就打平"说不到做到）：${JSON.stringify(missingDigits)}`,
+  );
+});
+
 /* ───────────────────────── 措辞与边界 ───────────────────────── */
 
 test('UI 契约：全站不出现概率/胜率/推荐类表述，除非处于否定语境', () => {

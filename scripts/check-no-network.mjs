@@ -179,6 +179,23 @@ export const SAFE_FRAGMENTS = [
 ];
 
 /**
+ * robots.txt 的 `Sitemap:` 指令。
+ *
+ * 为什么需要单独处理：robots.txt 规范要求 Sitemap 的值是**绝对 URL**（相对路径不合法），
+ * 于是它必然命中「外部 URL 引用」规则，让 pages.yml 的 test job 直接 FAIL、部署被卡住。
+ * 但这条指令是给搜索引擎爬虫读的**文本元数据**，页面运行时不请求它 ——
+ * 和 OG / canonical 是同一类，只是它不在 HTML 里，所以没法塞进 SAFE_FRAGMENTS。
+ *
+ * 边界（为什么不做成全局 SAFE_FRAGMENTS 条目）：
+ *   · 只在 `site/robots.txt` 这一个文件里生效，别的文件里出现 `Sitemap: https://…`
+ *     仍然照常判违规（见 tests/qa/audit-bypass.test.mjs 的回归用例）；
+ *   · 逐行匹配、锚定行首行尾，同一行里夹带别的东西就匹配不上、照常扫描；
+ *   · 密钥规则不受影响，robots.txt 里的 token 照样会被抓到。
+ */
+const ROBOTS_SITEMAP_LINE = /^\s*Sitemap:\s*https?:\/\/\S+\s*$/i;
+const ROBOTS_FILE = /(?:^|[\\/])robots\.txt$/i;
+
+/**
  * 行级注释豁免：整行必须是一个**说明性注释**，且不带任何「调用形式」的危险字面量。
  *
  * 历史缺陷（已修）：早期版本只要行首是注释且出现否定词，整行就跳过。
@@ -247,7 +264,7 @@ const CALL_SHAPED = [
   /=\s*document\.cookie/,
 ];
 
-function scanLine(line) {
+function scanLine(line, fileRel = '') {
   if (isAllowlisted(line)) {
     // 注释豁免：只有在"不含任何调用形式的危险字面量"时才真正放行
     const looksLikeRealCall = CALL_SHAPED.some((re) => {
@@ -257,6 +274,8 @@ function scanLine(line) {
     if (!looksLikeRealCall) return null; // 纯说明，放行
     // 含真实调用 → 继续往下走，让它被抓到
   }
+  // robots.txt 的 Sitemap 指令：只在这一个文件里、只对这一行生效（见 ROBOTS_SITEMAP_LINE）
+  if (ROBOTS_FILE.test(fileRel) && ROBOTS_SITEMAP_LINE.test(line)) return null;
   return stripSafeFragments(line);
 }
 
@@ -285,7 +304,7 @@ async function main() {
       const isSelf = rel === SELF_PATH;
       const lines = text.split(/\r?\n/);
       lines.forEach((line, i) => {
-        const scannedLine = scanLine(line);
+        const scannedLine = scanLine(line, rel);
         if (scannedLine === null) return; // 已确认为纯说明注释
         if (!isSelf) {
           for (const { re, label } of FORBIDDEN) {

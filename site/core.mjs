@@ -473,6 +473,231 @@ export function findFlipThresholds(raw) {
 }
 
 /**
+ * 诊断"为什么翻不过来"。
+ *
+ * 一个决策翻不过来，原因不是笼统的一种。本函数把它归到五类，供 UI 说清楚"到底为什么"：
+ *
+ *   ALL_SAME_SIGN  所有 d_k 严格同号（全正或全负，**且没有 d_k = 0**）。
+ *                  **结构性**不可能翻转：Δ = 10Σp_i d_i 是 d 的非负加权和，
+ *                  d 全部同号时 Δ 恒与它们同号，权重只能放大/缩小差距，不能改变方向。
+ *                  这是强结论，可以说死。
+ *
+ *   ZERO_GAP       存在 d_k = 0 的因素（该因素上 A、B 同分），且没有可行阈值。
+ *                  这类因素"不表态"——它自己既不加分也不减分，并把严格同号的前提破坏掉。
+ *                  单独成一类，是因为把它归到 OUT_OF_RANGE 会**说错原因**：
+ *                  真正的问题不是"临界点太远"，而是"这个因素根本没有区分度"。
+ *
+ *   OUT_OF_RANGE   d 有正有负且都非零（理论上必有可行解，见下），
+ *                  但每个因素的临界点 t* 都落在 (0,1) 之外。
+ *                  是"有可能但做不到"，与 ALL_SAME_SIGN 的"根本不可能"性质不同。
+ *
+ *                  注：严格异号（有正有负、无 0）时**必然存在**可行 t*，本类实际不可达，
+ *                  仅作为兜底分支保留。证明：设 S=Σw_i d_i：
+ *                    · 若 S ≤ 0，取 d_k>0 者，则 d_o=(S−w_k d_k)/(W−w_k) < 0，
+ *                      得 t*=−d_o/(d_k−d_o) ∈ (0,1)（因 d_o<0<d_k）；
+ *                    · 若 S > 0，取 d_k<0 者，则 d_o > 0，同样得 t* ∈ (0,1)；
+ *                    · S = 0 时二者皆可。
+ *                  所以"翻不过来"的真正成因只有：同号 / 有 0 差 / 无杠杆。
+ *
+ *   NO_LEVERAGE    所有因素都没有杠杆：d_k 与其余因素的加权平均 d_others 相等，
+ *                  调任何因素的权重都只是整体缩放差距，不改变符号。
+ *
+ *   UNKNOWN        其余情况（含 SOLE_FACTOR / NOT_COMPUTABLE 等边缘成因），
+ *                  或**其实存在可行阈值**（此时 hasFlip = true，本函数不用于报"翻不过来"）。
+ *
+ * 约定：本函数**不改变** findFlipThresholds 的任何行为，也不修改入参。
+ *
+ * @returns {{
+ *   reason: 'ALL_SAME_SIGN'|'ZERO_GAP'|'OUT_OF_RANGE'|'NO_LEVERAGE'|'UNKNOWN',
+ *   detail: string,
+ *   sameSign: boolean,
+ *   outOfRange: number[],
+ *   hasFlip: boolean,
+ *   codes: string[],
+ *   zeroGapCount?: number
+ * }}
+ */
+export function diagnoseNoFlip(raw) {
+  const input = normalizeInput(raw);
+  const { factors, totalWeight } = input;
+  const thresholds = findFlipThresholds(raw);
+
+  const feasibleCount = thresholds.filter((t) => t.feasible).length;
+  const codes = thresholds.map((t) => t.code ?? 'UNKNOWN');
+  const hasFlip = feasibleCount > 0;
+
+  // d_k = rA - rB，逐因素
+  const gaps = factors.map((f) => f.ratings.A - f.ratings.B);
+  // 严格同号：全部 > 0 或 全部 < 0（0 视为"不表态"，会破坏严格同号）
+  const allPositive = gaps.length > 0 && gaps.every((d) => d > EPS);
+  const allNegative = gaps.length > 0 && gaps.every((d) => d < -EPS);
+  const sameSign = allPositive || allNegative;
+
+  // outOfRange：记录所有 t* 越界（OUT_OF_RANGE 或 BOUNDARY）的因素的临界点取值。
+  // 防 -0：t* = -d_o/(d_k-d_o)，当 d_o = 0 时分子为 -0，于是 t* 可能是 -0。
+  // JSON/字符串里显示为 0（无害），但 Object.is(-0, 0) === false，会把严格比较挂掉。
+  // 这里规范化成 +0（与 interval.mjs 的处理一致）。
+  const outOfRange = thresholds
+    .filter((t) => t.code === 'OUT_OF_RANGE' || t.code === 'BOUNDARY')
+    .map((t) => t.thresholdShare)
+    .filter((v) => typeof v === 'number' && Number.isFinite(v))
+    .map((v) => (v === 0 ? 0 : v));
+
+  const labelOf = (t) => `${t.label}(${fmtNum(t.ratingGap)})`;
+  const pctOf = (v) => `${(v * 100).toFixed(2)}%`;
+
+  // ── 有可行阈值：本函数不用于"翻不过来"，如实返回 hasFlip ──
+  if (hasFlip) {
+    return {
+      reason: 'UNKNOWN',
+      detail: `存在 ${feasibleCount} 个可行翻转阈值，结论可以翻过来，本诊断不适用。`,
+      sameSign,
+      outOfRange,
+      hasFlip: true,
+      codes,
+    };
+  }
+
+  // ── 1. 结构性：所有 d_k 严格同号 ──
+  if (sameSign) {
+    const dir = allPositive ? '正' : '负';
+    const who = allPositive ? 'A' : 'B';
+    const gapText = gaps.map((d) => fmtNum(d)).join('、');
+    return {
+      reason: 'ALL_SAME_SIGN',
+      detail:
+        `所有 ${gaps.length} 个因素的评分差 d_k 都是${dir}的（${gapText}），`
+        + `${who} 在每个因素上都不弱于对手。Δ 是 d 的非负加权和，`
+        + `所以无论怎么调整权重，差距只会变大或变小，不可能反号——`
+        + `这是结构性的，不是"差一点"。`,
+      sameSign: true,
+      outOfRange,
+      hasFlip: false,
+      codes,
+    };
+  }
+
+  // ── 2. 有 d_k = 0 的因素（该因素上没有区分度）──
+  //
+  // 必须排在 OUT_OF_RANGE 之前：这类输入里 t* 往往恰好贴在 0/1 上（BOUNDARY），
+  // 若先走越界分支，会对外宣称"临界点太远"，而真实原因是"这个因素两边的评分一样"。
+  const zeroGapThresholds = thresholds.filter((t) => Math.abs(t.ratingGap) <= EPS);
+  if (zeroGapThresholds.length > 0) {
+    const strictSigns = gaps.filter((d) => Math.abs(d) > EPS);
+    const posCount = strictSigns.filter((d) => d > 0).length;
+    const negCount = strictSigns.filter((d) => d < 0).length;
+    const mixed = posCount > 0 && negCount > 0;
+    const allZero = strictSigns.length === 0;
+    // 全 0 时"稀释其他因素的差距"不成立（没有其他差距），文案要分开写
+    const consequence = allZero
+      ? '所以两边在任何权重下都完全打平，且没有任何因素可以撬动。'
+      : '所以调整它们的权重只会稀释其他因素的差距，不会让结论翻转。';
+    const tail = allZero
+      ? '真正该做的是先给这些因素打出评分差别——去核实事实，而不是纠结权重。'
+      : '真正该做的是先给这些因素打出差别——去核实事实，而不是纠结权重。';
+    const lead = mixed
+      ? `其中 ${posCount} 个因素偏向 A、${negCount} 个偏向 B`
+      : posCount > 0
+        ? `其余 ${posCount} 个因素都偏向 A`
+        : negCount > 0
+          ? `其余 ${negCount} 个因素都偏向 B`
+          : '其余因素的评分差也全是 0';
+    return {
+      reason: 'ZERO_GAP',
+      detail:
+        `有 ${zeroGapThresholds.length} 个因素在上面的评分完全一样（`
+        + `${zeroGapThresholds.map((t) => `${t.label}=${fmtNum(t.ratingGap)}`).join('、')}），`
+        + `这些因素对 A/B 没有任何区分度：它们既不加分也不减分，`
+        + consequence
+        + `${lead}，但没有一个因素的临界点落在可调范围内。`
+        + tail,
+      sameSign: false,
+      outOfRange,
+      hasFlip: false,
+      codes,
+      zeroGapCount: zeroGapThresholds.length,
+    };
+  }
+
+  // ── 3. 有杠杆但全部越界 ──
+  const codeset = new Set(codes);
+  if (codeset.has('OUT_OF_RANGE') || codeset.has('BOUNDARY')) {
+    const detailParts = [];
+    const oor = thresholds.filter((t) => t.code === 'OUT_OF_RANGE');
+    const bnd = thresholds.filter((t) => t.code === 'BOUNDARY');
+    const nonLever = thresholds.filter((t) => t.code === 'NO_LEVERAGE');
+
+    if (oor.length > 0) {
+      detailParts.push(
+        `评分差 d_k 有正有负（${gaps.map((d) => fmtNum(d)).join('、')}）；`
+        + `但 ${oor.length} 个因素的临界点 t* 全部越界：`
+        + oor.map((t) => `${labelOf(t)}→t*=${pctOf(t.thresholdShare)}`).join('；')
+        + `。要把这些占比调到 0–100% 之外才可能打平，实际操作做不到。`,
+      );
+    }
+    if (bnd.length > 0) {
+      detailParts.push(
+        `${bnd.length} 个因素的临界点恰好贴在边界上：`
+        + bnd.map((t) => `${labelOf(t)}→t*=${pctOf(t.thresholdShare)}`).join('；')
+        + `，在可调范围内没有真正的翻盘空间。`,
+      );
+    }
+    if (nonLever.length > 0) {
+      detailParts.push(
+        `另有 ${nonLever.length} 个因素没有杠杆（其评分差与其余因素的加权平均相等），`
+        + `调整它们的权重只会整体缩放差距，不改变符号。`,
+      );
+    }
+
+    return {
+      reason: 'OUT_OF_RANGE',
+      detail: detailParts.join(''),
+      sameSign: false,
+      outOfRange,
+      hasFlip: false,
+      codes,
+    };
+  }
+
+  // ── 4. 无杠杆 ──
+  if (codeset.has('NO_LEVERAGE')) {
+    const nonLever = thresholds.filter((t) => t.code === 'NO_LEVERAGE');
+    return {
+      reason: 'NO_LEVERAGE',
+      detail:
+        `没有任何因素的临界点落在 0–100% 之内，且其中 ${nonLever.length} 个因素是"无杠杆"的：`
+        + `${nonLever.map(labelOf).join('、')}。`
+        + `这些因素自身的评分差与其余因素的加权平均相等，`
+        + `调整它们的权重只会整体的放大或缩小差距，不会让两边换位。`,
+      sameSign: false,
+      outOfRange,
+      hasFlip: false,
+      codes,
+    };
+  }
+
+  // ── 4. 其余（SOLE_FACTOR / NOT_COMPUTABLE / 空数组等） ──
+  return {
+    reason: 'UNKNOWN',
+    detail:
+      `没有可行翻转阈值，但成因不属于前三类（codes: ${codes.join(', ') || '空'}）。`
+      + `常见于仅一个因素有权重（SOLE_FACTOR）或数值极端（NOT_COMPUTABLE）。`,
+    sameSign: false,
+    outOfRange,
+    hasFlip: false,
+    codes,
+  };
+}
+
+/** 数字格式化：整数不显示小数点，其余最多保留 4 位，避免 -0 */
+function fmtNum(v) {
+  if (!Number.isFinite(v)) return String(v);
+  const rounded = Math.round(v * 10000) / 10000;
+  const safe = rounded === 0 ? 0 : rounded; // 防 -0
+  return Number.isInteger(safe) ? String(safe) : String(safe);
+}
+
+/**
  * 排序：可行且离当前占比最近的排前面，方便 UI 直接取第一条做"最关键的反转条件"。
  */
 export function rankFlipCandidates(thresholds) {

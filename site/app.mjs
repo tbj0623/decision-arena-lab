@@ -1076,7 +1076,20 @@ function buildShareText() {
   lines.push(`结果：A ${fmt1(lastAnalysis.scoreA)} 分 / B ${fmt1(lastAnalysis.scoreB)} 分（差 ${fmt1(Math.abs(lastAnalysis.difference))}）。`);
   lines.push('');
   if (lastFlip) {
-    lines.push(`最关键的一条：把「${lastFlip.label}」的权重占比调到 ${pct(lastFlip.thresholdShare)}，两边就会打平，再越过就翻过来。`);
+    // 精度必须与页面内一致（2 位），否则分享出去的数字说不到做到的事。
+    //
+    // red-team 的 P0：这里原本 `pct(lastFlip.thresholdShare)` 用的是默认值 1 位小数，
+    // 于是分享文本写"调到 39.4% 就会打平"，而实测 39.4% 处 Δ=−0.004（没打平）。
+    // 页面内其他 9 处调用全部显式传了 2 或 4 —— 当初修 P0-3 时唯独漏了分享这一条路径。
+    //
+    // 为什么这条特别严重：页面内的错误用户当场能发现；
+    // 分享出去的错误会**离开产品语境**，别人照着调到 39.4% 发现没打平，
+    // 只会得出"这工具算错了"，而作者不在场无法澄清。
+    //
+    // 措辞也学页面内的 flipDescription：说"约 X（精确 Y）"，不声称某个两位小数值能精确命中。
+    const sharePct = pct(lastFlip.thresholdShare, 2);
+    const shareExact = pct(lastFlip.thresholdShare, 4);
+    lines.push(`最关键的一条：把「${lastFlip.label}」的权重占比调到约 ${sharePct}（精确 ${shareExact}），两边就会打平，再越过就翻过来。`);
   } else {
     lines.push('关键发现：各因素的评分方向一致，单靠调权重翻不过来——真正该做的是去核实那几条评分。');
   }

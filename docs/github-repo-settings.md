@@ -1,7 +1,33 @@
 # GitHub 仓库设置物料
 
 > 目的：把 GitHub 仓库首页的「About」区域一次性配好，让陌生人在 3 秒内看懂这是什么。
-> **本文件只是物料清单。以下所有操作都需要在 GitHub 网页 Settings 里手工完成——DSH 没有写入 GitHub 设置的权限，我不会假装已经设置好。**
+
+## 更新（2026-10-30）：大部分已经用 API 设置好了
+
+**下面这份文件原本假设"全部要手工设置"。实测这个假设是错的** ——
+本机的 `gh` CLI 已认证为仓库 owner，PATCH / PUT 都返回 2xx。
+
+**已经自动设置并回读验证的：**
+
+| 字段 | 值 |
+|---|---|
+| Description | 把纠结的两个选择拆成因素和权重，算出哪个权重改变多少会让结论翻转。纯前端静态站，不联网、不上传数据、无需登录，公式公开可核验。（63 字符） |
+| Homepage | https://tbj0623.github.io/decision-arena-lab/ |
+| Topics | 12 个：`accessibility` `chinese` `decision-making` `decision-support` `github-pages` `multi-criteria-decision-analysis` `no-dependencies` `offline-first` `privacy-first` `sensitivity-analysis` `static-site` `vanilla-javascript` |
+| has_wiki | ❌ 关闭 |
+| has_projects | ❌ 关闭 |
+| has_issues | ✅ 保持开启 |
+
+验证方式：设置后重新 `gh api repos/tbj0623/decision-arena-lab` 独立回读，全部一致。
+详见 `ops/release/GITHUB_METADATA_SET.md`。
+
+**仍然需要你手动做的只有一项：Social preview（见文末第 4 节）。**
+GitHub 没有提供设置 Social preview 的公开 API 端点。
+
+> ⚠️ 一个环境坑（记下来省得下次踩）：本机 Git Bash（MSYS）会把 `gh api /repos/...`
+> 的**前导斜杠当成路径转换**，报 `invalid API endpoint: "C:/Users/.../repos/..."`。
+> 把前导斜杠去掉（写成 `repos/tbj0623/...`）就正常。
+> 另外 `-f` 传字符串、`-F` 传类型推断（布尔要用 `-F`，否则会被发成 `"false"` 字符串）。
 
 仓库：`https://github.com/tbj0623/decision-arena-lab`
 
