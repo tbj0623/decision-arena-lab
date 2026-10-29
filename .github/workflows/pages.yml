@@ -1,0 +1,68 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 只读源码 + 写 Pages + 用 OIDC 换取部署令牌
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只允许一个部署；不要取消正在进行的（否则可能留下半套产物）
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test before deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Run algorithm unit tests
+        # 注意：Node 24 的 `node --test tests/` 会把目录当成模块解析而报错，
+        # 用无参数的形式让 Node 自动发现 **/*.test.mjs，或用 glob。
+        run: node --test
+
+      - name: Static audit (no network / no persistence / no secrets)
+        run: node scripts/check-no-network.mjs
+
+  build:
+    name: Build static artifact
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stage site directory
+        run: |
+          mkdir -p _site
+          cp -r site/. _site/
+          # 让 GitHub Pages 跳过 Jekyll 处理，避免下划线开头的文件被忽略
+          touch _site/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

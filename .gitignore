@@ -1,0 +1,33 @@
+# Secrets / credentials — never commit
+.env
+.env.*
+*.pem
+*.key
+*.p12
+id_rsa*
+credentials.json
+
+# Dependencies / build output
+node_modules/
+dist/*.zip
+dist/*.tar.gz
+*.log
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# ─── 内部工作区：默认不公开 ───────────────────────────────────────────
+# work/ 放的是成员的过程稿、原始日志、临时脚本，不进入公开仓库。
+# 需要公开的成果会由 Lead 审定后复制到 docs/ 或 marketing/ 下。
+work/
+reports/
+dist/
+*.sha256
+
+# 内部状态文件（含网关地址、账号、本地路径）——绝不公开
+_internal/
+
