@@ -3002,7 +3002,16 @@ main:focus:not(:focus-visible) {
    为什么不在 360px 也堆叠：360px 两列时输入框有 46.5px，够用；
    堆叠会让卡片变高一倍，得不偿失。
    -------------------------------------------------------------------------- */
+/* 注意：`.rating-block` 是 **flex + wrap**（为错误提示排版改的，见上面 D-03），
+   `.rating-row` 固定 `flex: 0 0 calc(50% - .275rem)`。
+   我第一版写成 `grid-template-columns: 1fr` —— 完全没生效（display 是 flex）；
+   第二版写 `flex-direction: column` —— 也没用，因为子项有 `flex-basis` 和 wrap，
+   仍按 50% 排。实测确认：blockW 252 但每个 rating-row 仍只有 122px。
+
+   正确覆盖：把子项的 flex-basis 改成 100%，让它独占一行。 */
 @media (max-width: 359px) {
-  .rating-block { grid-template-columns: 1fr; }
+  .rating-block > .rating-row { flex: 0 0 100%; }
+  /* 错误提示原本要横跨两栏（200% + 间距），单列后改成撑满一行即可 */
+  .rating-row > .rating-error { width: 100%; }
 }
 .stepper input[type="number"] { min-width: 2.6ch; }
