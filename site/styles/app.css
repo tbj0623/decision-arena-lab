@@ -2770,6 +2770,33 @@ main:focus:not(:focus-visible) {
   }
   /* 因素卡之间留出断页余量，避免刚好卡在边界 */
   .factor-item { margin-bottom: 6pt; }
+
+  /* ── 打印态下"深色首屏"必须变回纸面配色（端到端走查发现，真实缺陷）──
+     .hero 在**任何主题下**都是深海军蓝（品牌锁定），文字色 --hero-text 是 #f3f8fa。
+     打印时我们只把 --bg 和 body 置白，但没覆盖 --hero-text ——
+     于是 `.hero-boundary strong` 变成**白底白字**，实测对比度 1.07:1。
+     三句全是免责边界："得分来自你自己打的分数和你设的权重""分数衡量的是你的偏好"
+     "不能替你做决定" —— 打印件里最不该消失的内容。
+
+     触发条件很普通：打印前点开过一次「它不是什么」就行。 */
+  .hero,
+  .hero-boundary,
+  .hero-boundary summary,
+  .hero-boundary strong,
+  .hero-boundary p {
+    color: #000 !important;
+    background: transparent !important;
+  }
+  .hero-boundary summary { border-color: #666 !important; }
+  /* summary 原本是薄荷绿压白底（1.52:1），一并修成黑 */
+  .hero * { color: #000 !important; }
+  .hero { background: transparent !important; }
+  .hero-grid { display: block !important; }
+
+  /* 孤儿标题：.example-grid 被隐藏了，但 #examples 没隐藏，
+     纸上留下一个"九个虚构例子，点开就能玩"的标题下面空空如也。
+     打印时整块隐藏（那些卡本来也是 JS 注入的按钮，纸上没意义）。 */
+  #examples { display: none !important; }
 }
 
 /* --------------------------------------------------------------------------

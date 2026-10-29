@@ -1068,7 +1068,7 @@ function buildFlipSlider(flip) {
     //   · 「跳到精确临界点」按钮现在会真写 state（见下面 onclick）
     el('p', { class: 'flip-preview-tag' },
       el('span', { class: 'flip-preview-dot', 'aria-hidden': 'true' }),
-      el('span', {}, '预览：这一条只影响下面这张卡，不会改动你上面填的方案'),
+      el('span', {}, '试算：拖这根滑杆只影响下面这张卡，不改动你上面填的方案'),
     ),
     el('label', { for: sliderId },
       el('span', {}, '亲手拨一下：把「', el('strong', { text: flip.label }), '」的权重占比拖到 ',
@@ -1110,11 +1110,25 @@ function buildFlipSlider(flip) {
         }
       }
       const projected = describe(targetShare, { moveSlider: true });
-      jumpHint.textContent = Math.abs(projected.difference) < 1e-6
-        ? `已把「${flip.label}」的权重设为精确临界值 ${pct(targetShare, 4)}，上方结果与左侧权重已同步：两边分数相同。`
+      // 注意：上面 renderFactorList() + recalc() 会把整个翻转卡重建，
+      // 所以**不能**往自己这个 jumpHint 里写提示 —— 它已经不在文档里了。
+      // 实测（端到端走查发现）：点了按钮后确认文案消失、元素数量 1→0，
+      // 等于"悄悄改了用户的数据还不告诉人"。
+      //
+      // 改写到卡片外的常驻状态区（recalc 不会重建它），并声明这是真实改动。
+      const msg = Math.abs(projected.difference) < 1e-6
+        ? `已把「${flip.label}」的权重真的改成 ${state.factors.find(f => f.id === flip.factorId)?.weight}（占比 ${pct(targetShare, 4)}）。上方结果、左侧权重滑杆、导出数据都已同步——两边分数相同。`
         : `注意：此处残差 ${projected.difference.toExponential(2)}，未达到打平阈值。`;
+      const live = document.querySelector('#equal-weights-note') || document.querySelector('#factors-error');
+      if (live) {
+        live.textContent = msg;
+        live.hidden = false;
+        // 5 秒后自动收起，避免长期占位
+        clearTimeout(window.__jumpMsgTimer);
+        window.__jumpMsgTimer = setTimeout(() => { live.hidden = true; live.textContent = ''; }, 6000);
+      }
     },
-  }, '跳到精确临界点');
+  }, '跳到精确临界点（会真的改权重）');
 
   const jumpHint = el('p', { class: 'flip-jump-hint', 'aria-live': 'polite' });
 
