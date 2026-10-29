@@ -179,6 +179,11 @@ scripts/         serve / check-no-network / make-release
 
 完整说明见 [局限说明](docs/LIMITATIONS.md)；版本变更见 [CHANGELOG](docs/CHANGELOG.md)。
 
+## 交付与维护
+
+- [V9 最终交付报告](docs/release/V9_FINAL_DELIVERY.md) — 全部要求逐条对照、修掉的 32 个缺陷、线上实测数据、未完成项清单
+- [回滚方案](docs/release/ROLLBACK_V9.md) — 三条可执行的回滚路径
+
 ## 许可
 
 [MIT License](LICENSE)。开源，但**不对现实决定的结果作任何保证**。

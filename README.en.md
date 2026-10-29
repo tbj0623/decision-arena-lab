@@ -186,6 +186,11 @@ Feedback is welcome on **broken features, copy that doesn't land, mobile experie
 
 The full statement is in [Limitations](docs/LIMITATIONS.md); version history is in the [CHANGELOG](docs/CHANGELOG.md).
 
+## Delivery and maintenance
+
+- [V9 final delivery report](docs/release/V9_FINAL_DELIVERY.md) — every requirement checked off, the 32 defects fixed, live measurements, and an honest list of what was *not* done
+- [Rollback plan](docs/release/ROLLBACK_V9.md) — three executable paths
+
 ## License
 
 [MIT License](LICENSE). Open source, with **no guarantee whatsoever about how real-world decisions turn out**.
