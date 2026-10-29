@@ -30,7 +30,7 @@
 | 后端 | **无**。没有服务器、没有数据库、没有 API |
 | 网络请求 | **0**（有静态审计脚本保证，见下） |
 | 存储 | **0**（不用 localStorage / sessionStorage / IndexedDB / Cookie） |
-| 测试 | **187 项，全部通过**（`node --test`） |
+| 测试 | **211 项，全部通过**（`node --test`） |
 
 `node --test` 会自动发现全部测试文件。注意：在 Node 24 下 `node --test tests/` 会把目录当模块解析并报 `MODULE_NOT_FOUND`，**用无参数形式**。
 
@@ -84,7 +84,7 @@ $$\boxed{t^* = -\frac{d_{\text{others}}}{d_k - d_{\text{others}}}}$$
 node scripts/check-no-network.mjs
 ```
 
-它会静态扫描 `site/` 下所有文件，检测 `fetch` / `XMLHttpRequest` / `WebSocket` / `sendBeacon` / `localStorage` / `sessionStorage` / `indexedDB` 以及密钥模式，**命中即失败并报出行号**。当前实测扫描 **12 个文件、约 248 KB**，输出 `PASS`。
+它会静态扫描 `site/` 下所有文件，检测 `fetch` / `XMLHttpRequest` / `WebSocket` / `sendBeacon` / `localStorage` / `sessionStorage` / `indexedDB` 以及密钥模式，**命中即失败并报出行号**。当前实测扫描 **12 个文件、280,595 字节（约 274 KB）**，输出 `PASS`。
 
 这比"我们承诺不收集数据"强的地方在于：**任何人 clone 下来跑一遍就能验证**，而且一旦有人加了埋点，CI 会红。
 
@@ -103,14 +103,14 @@ site/
 ├── app.mjs               ← 只做事件绑定与渲染
 ├── index.html
 ├── features/
-│   ├── narrative.mjs     ← 5 个虚构示例（数据）
+│   ├── narrative.mjs     ← 9 个虚构示例（数据）
 │   └── interval.mjs      ← 区间/取整相关逻辑
 ├── data/validation-actions.mjs
 ├── assets/               ← 品牌图标、OG 卡
 └── styles/app.css
 ```
 
-`core.mjs` 不引用任何 DOM API，所以能在 Node 里直接 `import` 测试。这意味着：**改 UI 不会改坏数学**，改数学会被 187 项测试拦住。
+`core.mjs` 不引用任何 DOM API，所以能在 Node 里直接 `import` 测试。这意味着：**改 UI 不会改坏数学**，改数学会被 211 项测试拦住。
 
 ### 核心导出
 
@@ -128,7 +128,7 @@ site/
 git clone https://github.com/tbj0623/decision-arena-lab.git
 cd decision-arena-lab
 
-node --test                        # 187 项测试
+node --test                        # 211 项测试
 node scripts/check-no-network.mjs  # 静态审计：零网络请求
 node scripts/serve.mjs             # 本地预览 http://127.0.0.1:8080/
 ```

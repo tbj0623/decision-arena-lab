@@ -11,19 +11,30 @@
 
 ## 零、基准先自己验，不采信转述
 
+**本轮为 V9-GROW-02 更新（2026-10-30 01:30 重新实测）**
+
 | 项 | 我的测法 | 结果 |
 |---|---|---|
-| 测试条数 | `node --test` | **187 tests / 187 pass / 0 fail / 0 todo** ✅ |
+| 测试条数 | `node --test` | **211 tests / 211 pass / 0 fail / 0 todo** ✅（上轮为 187，本轮已涨） |
+| 示例数量 | `EXAMPLES.length` | **9 个** ✅（上轮为 5） |
 | 站点可用 | `curl -w %{http_code}` | **200** ✅ |
-| **线上是否同一版本** | 下载线上 `app.mjs` / `core.mjs` / `index.html` / `features/narrative.mjs`，与仓库逐一比对 **sha256** | **四个文件哈希完全一致** ✅ |
-| 与远端 main 的关系 | `git fetch` → 比对 `origin/main` 与我本地 HEAD 的 `site/` 文件哈希 | **site/ 四个文件完全相同**（提交历史不同：本地 `8102f77` 是 `design/v9-brand-experience`，远端 main 是 `4413fa9`，但**渲染出的站点是同一份**） |
-| 版本号 | `site/core.mjs:24` | `export const VERSION = '1.1.3'` |
+| **线上是否同一版本** | 下载线上 `app.mjs` / `index.html` / `features/narrative.mjs`，与仓库比对 **sha256** | **三个文件哈希完全一致** ✅ |
+| 本地 HEAD | `git rev-parse` | `4b1dd2b` (`design/v9-brand-experience`)，提交信息 `feat(v9.9): 30 秒真操作演示 GIF/MP4 + 英文 README + README 精度修正` |
+| 版本号 | `site/core.mjs` | `export const VERSION = '1.1.3'` |
+| 演示资产 | 直接读文件字节 | `demo-30s.gif` = **978,975 B（≈0.93 MB）**；`demo-30s.mp4` = **627,097 B（≈0.60 MB）** |
+| 演示 GIF 时长 | Pillow 逐帧解码 | **180 帧 / 30.04 秒 / 960×600** |
 
-> 说明：Lead 给的是 `main: 4413fa9c`，我本地在 `8102f77`。两者 site/ 文件哈希一致，所以"线上显示什么"这件事没有分歧。**我没有在素材里写任何提交号或版本号**——读者在页面上找不到对应物，写了是噪音。
+> ⚠️ **两处与 Lead 转述不符（以我的实测为准）**：
+> 1. GIF 大小：转述 0.77 MB，**实测 978,975 字节 ≈ 0.93 MB**。
+> 2. MP4 大小：转述 0.69 MB，**实测 627,097 字节 ≈ 0.60 MB**。
+>
+> 我无法解释差异（可能是压缩前后两个版本，或统计口径不同）。**素材里我一律用实测字节数**，并同时给出 MB 换算。
+>
+> 另外：`oldguitar` 的分数转述为 72.6/58.9，**我实测一致**；但它上一轮是 74.7/58.9，说明这个示例的评分又被改过。
 
 ### 数字的验证方式
 
-**不只跑 Node。** 我用 Playwright 打开线上真实页面，操作真实滑杆，读真实 DOM 文本。
+**不只跑 Node。** 我同时用两种方式：① `core.mjs` 实算；② Playwright 打开线上真实页面、操作真实滑杆、读真实 DOM 文本。两者一致才算 MATCH。
 
 ---
 

@@ -2,7 +2,7 @@
   "name": "反悔雷达 · Decision Arena",
   "short_name": "反悔雷达",
   "description": "把纠结的选择拆成权重、评分和翻转条件，看清什么会改变你的决定。",
-  "start_url": "/decision-arena-lab/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#081827",
   "theme_color": "#081827",
