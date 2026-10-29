@@ -1703,3 +1703,97 @@ if (document.readyState === 'loading') {
 } else {
   boot();
 }
+
+/* ===== 触屏滑杆手势防护（P0）===== */
+/**
+ * 手指落在滑杆上想上下滚页面时，浏览器会把权重"跳"到触点位置，且不还原。
+ * 实测：工作区 w-f2 从 4 跳到 8，页面滚了 105px，值没回来。
+ *
+ * 修法：不阻止跳值（阻止不了，见下），而是跳了之后能还原。
+ *   · pointerdown：快照值
+ *   · 首次 touchmove：判断方向
+ *       纵向为主 → 用户在滚页面 → 还原快照
+ *       横向为主 → 用户在拖滑杆 → 不动
+ *   · 点按（无位移）→ 保留原生"点哪跳哪"
+ *
+ * 为什么不能靠 CSS / preventDefault：
+ *   实测 touch-action: pan-y、capture 阶段 preventDefault、两者合用，
+ *   在 Chromium 里全部无效 —— 原生 range 的跳值发生在 pointerdown
+ *   的默认动作里，早于任何监听器。
+ *
+ * 用委托挂在 document 上，动态重建的滑杆自动覆盖。
+ */
+(function installTouchSliderGuard() {
+  if (typeof window === 'undefined') return;
+
+  /** sliding 状态下已快照的元素 → 原始值 */
+  const snapshots = new WeakMap();
+  /** 已经判定为"纵向滚动"的元素（后续 move 不再处理） */
+  const verticalGesture = new WeakSet();
+
+  const isRange = (el) => el instanceof HTMLInputElement && el.type === 'range';
+
+  document.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (!isRange(e.target)) return;
+      // 只对触摸/笔生效；鼠标拖动本来就是用户明确要拖
+      if (e.pointerType === 'mouse') return;
+      snapshots.set(e.target, e.target.value);
+      verticalGesture.delete(e.target);
+    },
+    true,
+  );
+
+  document.addEventListener(
+    'touchmove',
+    (e) => {
+      const el = e.target;
+      if (!isRange(el)) return;
+      if (!snapshots.has(el)) return;
+      if (verticalGesture.has(el)) return;
+
+      const t = e.touches && e.touches[0];
+      if (!t) return;
+      // 用"当前触点相对视口"的位移不可靠（页面在滚），
+      // 所以只判**单帧内的相对方向**：记录上一次触点位置。
+      const prev = el.__lastTouch;
+      el.__lastTouch = { x: t.clientX, y: t.clientY };
+      if (!prev) return;
+
+      const dx = t.clientX - prev.x;
+      const dy = t.clientY - prev.y;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+      el.__accX = (el.__accX || 0) + absX;
+      el.__accY = (el.__accY || 0) + absY;
+
+      // 累计位移超过 8px 才判定，避免手指微抖误判
+      if (el.__accX + el.__accY < 8) return;
+
+      if (el.__accY > 8 && el.__accY > el.__accX * 1.2) {
+        // 纵向为主 → 用户在滚页面 → 还原被误改的值
+        el.value = snapshots.get(el);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        verticalGesture.add(el);
+      }
+      // 横向为主 → 保持原生拖拽，不做任何事
+    },
+    { passive: true },
+  );
+
+  const reset = (e) => {
+    const el = e.target;
+    if (isRange(el)) {
+      el.__accX = 0;
+      el.__accY = 0;
+      el.__lastTouch = null;
+      snapshots.delete(el);
+      verticalGesture.delete(el);
+    }
+  };
+  document.addEventListener('touchend', reset, true);
+  document.addEventListener('touchcancel', reset, true);
+})();
+

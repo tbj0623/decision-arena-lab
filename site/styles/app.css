@@ -164,8 +164,13 @@ html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   scroll-behavior: smooth;
-  /* 吸顶页头会盖住锚点目标，滚动定位时补上它的高度 */
-  scroll-padding-top: 78px;
+  /* 吸顶页头的补偿**只在一处做**，不要两套叠加。
+     曾经同时写了这里的 scroll-padding-top: 78px
+     和锚点元素上的 scroll-margin-top: calc(63+12)=75px，
+     两者相加 → 标题落到了页头下 127px 处（移动端触屏验证实测）。
+     注意：这不是"被遮住"，是**过度补偿** —— 方向相反，别按遮挡去修。
+     保留下面的 scroll-margin-top（它按 --header-h 走，手机端会自动变 68px），
+     这里不再设 scroll-padding-top。 */
   scrollbar-color: var(--line-strong) transparent;
   scrollbar-width: thin;
 }
