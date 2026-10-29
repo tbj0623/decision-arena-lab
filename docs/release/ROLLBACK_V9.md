@@ -1,12 +1,80 @@
 # ROLLBACK_V9 — V9 回滚预案
 
-> 编写：2026-10-29 23:30 CST · release-engineer
-> 适用：V9「品牌与产品重设计」上线后发现问题，需要恢复
-> **本文件不含已执行的写操作** —— 所有命令待你亲自执行
+> ══════════════════════════════════════════════════════════════════
+> **2026-10-30 05:55 CST 更新：网络恢复，本文件的前提已改变**
+>
+> 下面的「三、先读这一节」写的是 **2026-10-29 的情况**：当时 `github.com:443` 被阻断，
+> `git fetch` 不可用，本地只有 1 个孤立提交，所以 `git revert` / `git reset --hard`
+> 一条都跑不了，只能靠 API 逐个取文件。
+>
+> **现在网络已恢复，本地历史已经和远端真正接通。上面那个前提作废了。**
+> 实测（都已验证过）：
+> ```text
+> $ git rev-list --count HEAD
+> 46                                  ← 不再是 1
+>
+> $ git log --oneline -3
+> 06b552b docs(v9.32): 报告补到 42 个缺陷
+> f1ac5b6 fix(v9.32): 跳转按钮在权重被截断时谎报打平 + 两卡判据不一致
+> 882b620 docs(v9.31): 报告补到 40 个缺陷 / 11 条阻断
+>
+> $ git cat-file -t 882b620           ← 远端提交对象本地已存在
+> commit
+>
+> $ git show 90d7f39:site/app.mjs | wc -l
+> 1685                                ← 能直接读历史版本的文件
+>
+> $ git revert --no-commit 90d7f39    ← 真的能跑（试跑后已 --abort）
+> Auto-merging site/app.mjs
+> ```
+>
+> **所以：回滚现在优先用「一、最简回滚（git revert）」，它是首选路径。**
+> 「二」及以后的 API 取文件方案降级为**兜底**（万一以后网络又断）。
+> ══════════════════════════════════════════════════════════════════
 
 ---
 
-## 零、先读这一节：一个必须先知道的事实
+## 一、最简回滚（git revert）—— **网络恢复后的首选**
+
+```bash
+cd C:/Users/11930/Desktop/十脑造物局/decision-arena-lab
+
+# 1) 先确认要撤哪些提交（从最新往回看）
+git log --oneline -10
+
+# 2) 撤掉单个提交（产生一个反向提交，历史保留）
+git revert <sha>
+
+# 3) 撤掉一串（比如 v9.29 到 v9.32 共 4 个提交，按从新到旧逐个 revert）
+git revert --no-commit <newest>
+git revert --no-commit <next>
+...
+git commit -m "回滚：撤销 v9.29–v9.32"
+
+# 4) 只想看看历史文件长什么样（不改工作区）
+git show <sha>:site/app.mjs | head -40
+
+# 5) 验证之后再推送
+node --test                 # 应 215 pass / 0 fail
+node work/push-incremental.mjs
+```
+
+**注意两点：**
+
+1. `git push` 直连仍会在认证环节挂住（实测 `--dry-run` 卡住），
+   **推送继续用 `node work/push-incremental.mjs`**。它推送后会断言
+   `远端 tree === 本地 HEAD tree`，不等就报错。
+2. revert 之后**必须复测**：`node --test` + 在浏览器里点一遍
+   （首屏「跳到打平点」、9 个示例、「跳到精确临界点」、评分输入失焦生效）。
+   这个项目有过「撤销 A 导致 B 回退」的记录。
+
+---
+
+## 二、兜底：网络再断时用 API 取文件
+
+> 以下是 2026-10-29 网络被阻断时写的方案，**仍然可用**，
+> 但除非 `git fetch` 又不可用，否则用上面「一」的那条命令就够。
+## 三、先读这一节（历史记录：2026-10-29 当时的前提）
 
 ### ⚠️ 本地仓库没有 V9 之前的 commit
 
@@ -47,7 +115,7 @@ gh api /repos/tbj0623/decision-arena-lab/git/ref/heads/main --jq '.object.sha'
 
 ---
 
-## 一、三条回滚路径
+## 四、三条回滚路径（2026-10-29 网络阻断时期的方案）
 
 | 路径 | 适用场景 | 影响范围 | 风险 |
 |---|---|---|---|
@@ -57,7 +125,7 @@ gh api /repos/tbj0623/decision-arena-lab/git/ref/heads/main --jq '.object.sha'
 
 ---
 
-## 二、路径 A：整体回滚到 V9 之前（`847eb57e`）
+## 五、路径 A：整体回滚到 V9 之前（`847eb57e`）
 
 ### 适用
 
@@ -158,7 +226,7 @@ gh api /repos/tbj0623/decision-arena-lab/git/ref/heads/main --jq '.object.sha' |
 
 ---
 
-## 三、路径 B：只回滚首屏（保留品牌素材）
+## 六、路径 B：只回滚首屏（保留品牌素材）
 
 ### 适用
 
@@ -245,7 +313,7 @@ node work/push-incremental.mjs             # 再推
 
 ---
 
-## 四、路径 C：只回滚某个资产
+## 七、路径 C：只回滚某个资产
 
 ### 适用
 
@@ -289,7 +357,7 @@ node work/push-incremental.mjs
 
 ---
 
-## 五、回滚后必须验证的清单
+## 八、回滚后必须验证的清单
 
 > 回滚 ≠ 完成。**没有验证的回滚等于没回滚。**
 > 按顺序做完，五条全过才算成功。
@@ -376,7 +444,7 @@ await page.goto('https://tbj0623.github.io/decision-arena-lab/');
 
 ---
 
-## 六、已知陷阱（每条都踩过）
+## 九、已知陷阱（每条都踩过）
 
 ### 6.1 `github.com:443` 不通，`git push` 必失败
 
@@ -453,7 +521,7 @@ $ gh api .../git/ref/heads/main --jq '.object.sha'
 
 ---
 
-## 七、回滚决策速查
+## 十、回滚决策速查
 
 ```text
 问题严重吗？
@@ -475,7 +543,7 @@ $ gh api .../git/ref/heads/main --jq '.object.sha'
 
 ---
 
-## 八、如果回滚也失败了
+## 十一、如果回滚也失败了
 
 说明问题不在代码，在发布链路。按这个顺序排查：
 
@@ -494,7 +562,7 @@ $ gh api .../git/ref/heads/main --jq '.object.sha'
 
 ---
 
-## 九、本次备份位置（回滚的兜底）
+## 十二、本次备份位置（回滚的兜底）
 
 ```text
 C:\Users\11930\Desktop\十脑造物局\_v9_backup_20261029_232612\
@@ -523,7 +591,7 @@ Expand-Archive -Path "...\worktree-full.zip" -DestinationPath 恢复目录 -Forc
 
 ---
 
-## 十、红线自查
+## 十三、红线自查
 
 | 红线 | 状态 |
 |---|---|

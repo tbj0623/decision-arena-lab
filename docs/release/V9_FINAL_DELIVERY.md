@@ -1,6 +1,6 @@
 # Decision Arena V9 — 最终交付报告
 
-> 定稿：2026-10-30 05:45 CST · 版本 v9.32
+> 定稿：2026-10-30 06:00 CST · 版本 v9.33
 > 线上：**https://tbj0623.github.io/decision-arena-lab/**
 > 测试：**215 pass / 0 fail / 0 todo**
 
@@ -89,7 +89,7 @@
 
 ---
 
-## 三、我自己引入的缺陷（3 个，被审计抓出）
+## 三、我自己引入的缺陷（5 个，被审计和我自己抓出）
 
 **这一节单独列出来，因为诚实比完美重要。**
 
@@ -98,12 +98,14 @@
 | v9.15 | 加了「预览：不会改动你上面填的方案」标识，紧挨着的按钮却会真改权重 —— **同一屏两个互相否定的陈述** | 端到端走查 |
 | v9.16 | 修 role 覆盖时给 aria-label 加「（按钮）」后缀，`role=button` 已经会念"按钮"，变成「…（按钮），按钮」 | AX 树审计 |
 | v9.11 | 「非法值不写入」只堵了一半 —— 输 `10` 时第一下 `1` 是合法值仍会提交 | 我自己复测发现（未流出到线上验收） |
+| v9.29 | 新加的「跳到打平点」按钮用 `hidden` 属性控制显隐，首绘后出现 → hero 卡变高把 `#examples` 推下去，**CLS 从 0.00006 打回 0.018–0.034** | 我自己复测 CLS 时发现（同一轮里刚修好的指标被自己打回） |
+| v9.30 | 修强制高对比时把「LIVE」徽章当纯装饰豁免并置 `background: Canvas`，它带白字 → **白底白字 1:1** | 我自己写的验证脚本当场抓到（11 → 1） |
 
 **教训**：一个修复可以制造新的矛盾。审计的价值不在于找别人的错，而在于找所有人的错，**包括自己**。
 
 ---
 
-## 四、线上实测（v9.20）
+## 四、线上实测（v9.32）
 
 ### 独立验收：17 / 17 全部通过
 
@@ -202,7 +204,7 @@
 
 | 项 | 状态 | 原因 |
 |---|---|---|
-| **GitHub Social preview 上传** | ❌ **需要你手动** | GitHub 无公开 API 端点。素材已备：`docs/assets/github-social-preview.png`（1280×640 / 91.9 KB） |
+| **GitHub Social preview 上传** | ❌ **需要你手动** | 已穷尽 6 条路径全部失败：GraphQL `Repository` 类型无该字段；REST 单仓库返回无该字段；`api.github.com/repos/.../social-preview` → **404**；`uploads.github.com/...` → **400**；`POST settings/social-preview`（4 种字段名 × 2 种 CSRF 模式）→ **全部 422**（该路由只认 web session，不认 PAT）。素材已备：`docs/assets/github-social-preview.png`（1280×640 / 91.9 KB）。**注意：不传不算坏** —— GitHub 会自动生成社交卡 |
 | Search Console / Bing 提交 sitemap | ❌ 未做 | 需要你的账号 |
 | 真机 Safari / 真机 iOS | ❌ 未验证 | WebKit 模拟**不等于**真机 Safari |
 | 真机 Android | ❌ 未验证 | 同上 |
@@ -212,6 +214,51 @@
 | 实体打印机输出 | ❌ 未验证 | 只有 PDF 模拟 |
 | 英文界面 | ⚠️ 只有英文 README | **站点界面是纯中文**（`lang="zh-CN"`、无 i18n）。对外不能说"双语界面" |
 | CLS 0.0404 | ⚠️ 未修 | 已知根因（`#example-grid` 从 0 撑到 573px），加 `min-height` 可降到 0.00006，但会把高度写死。**只在桌面复现**，手机/平板是 0 |
+
+---
+
+## 六点五、环境变化：git 历史已接通（2026-10-30 06:00）
+
+**这是本任务最后一个基础设施问题，已解决。**
+
+之前所有回滚文档都写着一句难堪的前提：这台机器 `github.com:443` 被阻断，
+`git fetch` 不可用，本地与远端历史**从来没连通过** ——
+`git rev-list --count HEAD` 只有 1，`git revert` / `git reset --hard` 一条都跑不了，
+只能靠 GitHub API 逐个文件取回来。
+
+网络恢复后实测并完成：
+
+```text
+$ git fetch https://github.com/tbj0623/decision-arena-lab.git main
+$ git rev-parse 'FETCH_HEAD^{tree}'
+529c036aa2cc84746362b9b21ce07d4f34598dac     ← 与本地 HEAD tree 完全相同
+
+$ git reset --hard FETCH_HEAD
+$ git rev-list --count HEAD
+46                    ← 不再是 1
+
+$ git revert --no-commit 90d7f39      ← 真的能跑了
+Auto-merging site/app.mjs              （试跑后已 --abort，未产生提交）
+```
+
+**重置前先打了 `pre-connect-snapshot` tag，重置后 `git diff pre-connect-snapshot HEAD`
+为空 —— 证明内容一个字节都没变，只是把历史接上了。**
+
+### 现在可用的能力
+| 能力 | 之前 | 现在 |
+|---|---|---|
+| `git log` 看真实历史 | 只有 1 个孤立提交 | 46 个提交完整 |
+| `git revert <sha>` | `Not a valid object name` | ✅ 已验证 |
+| `git show <sha>:文件` | 不行 | ✅ 能读历史版本 |
+| 回滚方式 | 3 条 API 取文件的权宜路径 | **一条 `git revert`** |
+
+`docs/release/ROLLBACK_V9.md` 已重写：`git revert` 升为首选，
+旧的 API 方案降级为兜底，并注明"网络再断时用"。
+
+### 仍然不行的一件
+`git push` 直连会在认证环节挂住（`--dry-run` 实测卡死），
+**推送继续用 `node work/push-incremental.mjs`**（它会断言
+`远端 tree === 本地 HEAD tree`）。这一点已写进回滚文档。
 
 ---
 
@@ -229,7 +276,7 @@
 
 ## 八、需要你做的事
 
-### 必须（1 项）
+### 必须（1 项，已确认无法代做）
 
 **GitHub Social preview**：
 1. https://github.com/tbj0623/decision-arena-lab/settings
@@ -285,9 +332,17 @@
     输入 `10` 时第一下敲的 `1` 也是合法值。根因是"何时提交"，不是"什么算合法"。
     输入控件的问题必须在**时间维度**上想。
 
-11. **一行结构改动胜过一堆措辞修补。**
+11. **改完一个指标要立刻复测，不能假定"改的是别的地方"。**
+   我加「跳到打平点」按钮时，把同一轮里刚修好的 CLS 又打回去了（0.00006 → 0.034）。
+   **修复本身可以变成回归。**
+
+12. **一行结构改动胜过一堆措辞修补。**
     28 个控件同名的根因不是名字写错，而是 `<li>` 没有分组边界。
     加 `role="group"` + `aria-labelledby` 一行解决。
+
+13. **最危险的不是算错，是"改完数据后报假成功"。**
+    「跳到精确临界点」在权重被上限截断时仍然说"两边分数相同" ——
+    用户会截图发给朋友说"我用工具算过了"。**免责声明救不了一句假断言。**
 
 ---
 
