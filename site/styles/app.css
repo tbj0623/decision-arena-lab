@@ -2686,3 +2686,38 @@ main:focus:not(:focus-visible) {
   /* 因素卡之间留出断页余量，避免刚好卡在边界 */
   .factor-item { margin-bottom: 6pt; }
 }
+
+/* --------------------------------------------------------------------------
+   锚点跳转被吸顶页头遮住（Lead 实测发现）
+   --------------------------------------------------------------------------
+   页头是 `position: sticky; top: 0`，高约 63px。
+   点击导航（#examples / #how / #limits / #workspace）或 skip-link（#main）时，
+   浏览器把目标滚到视口顶部 —— **正好被页头盖住**。
+
+   实测：点击跳到 #examples 后，#examples-title 的 top=50px，
+   而页头 bottom=63px → 标题有 13px 被压在页头下面。
+
+   修法：给锚点目标加 scroll-margin-top，留出页头高度 + 一点呼吸。
+   这是纯 CSS 修复，不需要动 JS。
+   -------------------------------------------------------------------------- */
+:root {
+  /* 页头实际高度约 63px；留 12px 余量让标题不贴边 */
+  --header-h: 63px;
+  --anchor-gap: 12px;
+}
+
+#main,
+#examples,
+#how,
+#limits,
+#workspace,
+#examples-title,
+#result-card,
+#workspace-title {
+  scroll-margin-top: calc(var(--header-h) + var(--anchor-gap));
+}
+
+/* 手机上页头可能更高（logo + 导航换行），给多一点 */
+@media (max-width: 620px) {
+  :root { --header-h: 68px; }
+}

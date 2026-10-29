@@ -198,7 +198,21 @@ test('UI 契约：示例区标题必须与实际示例数量一致（D-06 回归
   const heading = HTML.match(/id="examples-title">([^<]+)</);
   assert.ok(heading, '应当能取到示例区标题');
   const keys = [...NARRATIVE.matchAll(/^\s{4}key: '([^']+)'/gm)].length;
-  const numeral = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6 }[heading[1].match(/[一二三四五六]/)?.[0]];
+
+  // 中文数字映射必须覆盖到实际可能用到的位数。
+  //
+  // 踩过的坑（ux-writer 发现）：这里原本只到「六」，正则也是 [一二三四五六]。
+  // 示例加到 9 个、标题写「九个」时，正则抓不到 → numeral 是 undefined →
+  // 断言报 `undefined !== 9`，**看起来像标题写错了，其实是测试自己不支持九**。
+  // 只改映射表不够，正则也得改，两处必须同时动。
+  //
+  // 现在覆盖 一~十二：中文里"十一""十二"是两个字符，所以映射表要把复合写法也列上。
+  const CN_NUM = {
+    一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10,
+    十一: 11, 十二: 12,
+  };
+  const matched = heading[1].match(/十[一二]|[一二三四五六七八九十]/)?.[0];
+  const numeral = CN_NUM[matched];
   assert.equal(numeral, keys, `标题说「${heading[1]}」，实际有 ${keys} 个示例`);
 });
 

@@ -127,6 +127,96 @@ export const EXAMPLES = [
       ],
     },
   },
+  {
+    key: 'city',
+    emoji: '🏙️',
+    tag: '职业',
+    title: '搬去那个新城市，还是留在现在的城市',
+    blurb: '对方开的条件确实好，可你在这座城市住了七年，楼下那家店老板都认得你。',
+    body: {
+      title: '搬去那个新城市，还是留在现在的城市',
+      options: [
+        { id: 'A', label: '搬去那个新城市' },
+        { id: 'B', label: '留在现在的城市' },
+      ],
+      // 刻意做成"每一项评分都偏向 B"：所有阈值都越界，用来演示"翻不过来"。
+      // 与 oldguitar 的区别：这个更接近真实的搬家纠结，且差 12.2 分（结论清楚），
+      // 不是"几乎打平"那种需要靠翻转判断的情形。
+      factors: [
+        { id: 'f1', label: '生活成本', weight: 5, ratings: { A: 6, B: 7 } },
+        { id: 'f2', label: '离家人近一点', weight: 4, ratings: { A: 5, B: 7 } },
+        { id: 'f3', label: '工作的稳定性', weight: 3, ratings: { A: 6, B: 7 } },
+        { id: 'f4', label: '已经认识的人', weight: 4, ratings: { A: 5, B: 6 } },
+        { id: 'f5', label: '每天通勤的时间', weight: 2, ratings: { A: 6, B: 7 } },
+      ],
+    },
+  },
+  {
+    key: 'car',
+    emoji: '🚗',
+    tag: '消费',
+    title: '买一台车，还是继续打车加公交',
+    blurb: '周末想去郊区看朋友，来回要倒三趟车。可真要买车，光是停车位这一项就够你想半天了。',
+    body: {
+      title: '买一台车，还是继续打车加公交',
+      options: [
+        { id: 'A', label: '买一台车' },
+        { id: 'B', label: '继续打车加公交' },
+      ],
+      factors: [
+        { id: 'f1', label: '每个月的固定支出', weight: 5, ratings: { A: 5, B: 7 } },
+        { id: 'f2', label: '周末出门的自由', weight: 4, ratings: { A: 8, B: 4 } },
+        { id: 'f3', label: '停车和保养的麻烦', weight: 3, ratings: { A: 5, B: 7 } },
+        { id: 'f4', label: '每天通勤的时间', weight: 4, ratings: { A: 7, B: 5 } },
+        { id: 'f5', label: '下雨天的心情', weight: 2, ratings: { A: 8, B: 5 } },
+      ],
+    },
+  },
+  {
+    key: 'longdist',
+    emoji: '💌',
+    tag: '关系',
+    title: '搬去对方在的城市，还是继续异地',
+    blurb: '你们已经异地两年，每个月见一次，每次分开都在车站站很久；可你这边的工作刚有起色。',
+    body: {
+      title: '搬去对方在的城市，还是继续异地',
+      options: [
+        { id: 'A', label: '搬去对方在的城市' },
+        { id: 'B', label: '继续异地' },
+      ],
+      // 关系类：只摆出用户自己的判断，不评价这段关系值不值得。
+      factors: [
+        { id: 'f1', label: '多久能见一次', weight: 6, ratings: { A: 9, B: 3 } },
+        { id: 'f2', label: '我这边的收入', weight: 5, ratings: { A: 4, B: 8 } },
+        { id: 'f3', label: '关系稳不稳', weight: 5, ratings: { A: 8, B: 4 } },
+        { id: 'f4', label: '重新找工作的成本', weight: 4, ratings: { A: 3, B: 8 } },
+        { id: 'f5', label: '两边家里人的看法', weight: 2, ratings: { A: 5, B: 6 } },
+      ],
+    },
+  },
+  {
+    key: 'pet',
+    emoji: '🐕',
+    tag: '生活',
+    title: '养一只狗，还是先不养',
+    blurb: '你在收容所看到那只混血小狗，它一直盯着你看。回家的路上你已经在想名字了，可你也知道自己下周就要出差三天。',
+    body: {
+      title: '养一只狗，还是先不养',
+      options: [
+        { id: 'A', label: '养一只狗' },
+        { id: 'B', label: '先不养' },
+      ],
+      // 按 SCENARIOS_14 改写清单：原「养得好的把握」会读成产品在评估你的养宠能力，
+      // 换成可核查的客观量「每天能固定陪它的时间」。数值未变（只改 label）。
+      factors: [
+        { id: 'f1', label: '每天要花的时间', weight: 6, ratings: { A: 5, B: 8 } },
+        { id: 'f2', label: '每个月的开销', weight: 5, ratings: { A: 6, B: 8 } },
+        { id: 'f3', label: '回家有人等的感觉', weight: 6, ratings: { A: 9, B: 4 } },
+        { id: 'f4', label: '出门旅行还方不方便', weight: 4, ratings: { A: 5, B: 8 } },
+        { id: 'f5', label: '每天能固定陪它的时间', weight: 3, ratings: { A: 6, B: 7 } },
+      ],
+    },
+  },
 ];
 
 export function findExample(key) {
