@@ -1555,7 +1555,13 @@ function initHeroDemo() {
   const jumpBtn = $('#hero-jump-tie');
   if (jumpBtn) {
     if (highlight && Number.isFinite(highlight.thresholdShare)) {
-      jumpBtn.hidden = false;
+      // 注意：**不要**用 hidden 属性控制显隐。
+      // 这个按钮在 HTML 里默认就是渲染出来的（首绘即占位）；
+      // 如果改成"先 hidden、JS 再显示"，hero 卡高度会在首绘后增长，
+      // 把下方 #examples 推下去 —— 实测 CLS 从 0.00006 涨到 0.018~0.034，
+      // 而且位移来源明确指向 #hero-demo / #examples（我自己引入的回归）。
+      // 没有可跳目标时用 visibility 隐藏，保留布局占位。
+      jumpBtn.style.visibility = 'visible';
       jumpBtn.addEventListener('click', () => {
         slider.value = String(highlight.thresholdShare * 100);
         // 先 input（刷新视觉）再 change（触发播报），模拟一次真实的"拖到并松手"
@@ -1564,7 +1570,7 @@ function initHeroDemo() {
         slider.focus();
       });
     } else {
-      jumpBtn.hidden = true;
+      jumpBtn.style.visibility = 'hidden';
     }
   }
 
