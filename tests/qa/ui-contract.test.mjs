@@ -40,21 +40,46 @@ function findLines(source, re) {
 test('UI 契约：文档语言、viewport 与首屏定位语齐备', () => {
   assert.match(HTML, /<html lang="zh-CN">/);
   assert.match(HTML, /<meta name="viewport" content="[^"]*width=device-width/);
-  // V9 品牌改版换了首屏主标题，定位语随之更新。
-  //
+
   // 这条测试的价值不在于锁死某一句话，而在于**保证首屏确实有一句明确定位**，
-  // 不是空着也不是放了一堆营销词。所以检查的是"核心承诺还在不在"：
-  //   1) 标题点出「犹豫的只是一个条件」这个产品主张
-  //   2) 副文案说清"找到临界点 + 去验证"，而不是承诺结果
+  // 不是空着也不是放了一堆营销词。
+  //
+  // 历史缺陷（story-engineer 审查发现，已修）：
+  // 原断言是 `HTML.includes('一个条件') && HTML.includes('临界点')`。
+  // 两个问题：
+  //   1) 它全文搜——只要文档**任何地方**出现"临界点"就过。
+  //      实测：把首屏 lede 里的"临界点"删掉后测试**仍然绿**，
+  //      因为 og:image:alt（第 29 行）和公式说明（第 335 行）里都有这个词。
+  //      这是一个**永远不会失败的测试**。
+  //   2) 更实质的问题是：要求首屏承诺"临界点"本身是错的。
+  //      9 个示例里有 2 个（city / oldguitar）根本翻不过来，
+  //      首屏说"找到临界点"是对这两类决策的过度承诺。
+  //
+  // 现在改成：只在首屏区块内检查，且检查的是"条件 + 翻转"这个说法，
+  // 而不是断言一定存在临界点。
+  const heroStart = HTML.indexOf('<section class="hero');
+  assert.ok(heroStart >= 0, '应当能找到 hero 区块');
+  const heroBlock = HTML.slice(heroStart, HTML.indexOf('id="examples"', heroStart));
+  assert.ok(heroBlock.length > 200, 'hero 区块不应为空');
+
   assert.ok(
-    HTML.includes('一个条件') && HTML.includes('临界点'),
-    '首屏定位语必须包含产品主张（一个条件 → 临界点）',
+    heroBlock.includes('一个条件'),
+    '首屏标题必须点出产品主张：你真正犹豫的也许只是一个条件',
   );
+  assert.ok(
+    /翻转/.test(heroBlock),
+    '首屏必须说明「什么条件下结论会翻转」这个核心用途',
+  );
+  // 反向：首屏不得承诺"一定有"可翻转的条件
+  // （city / oldguitar 这类所有因素同号的决策，数学上就是翻不过来）
+  assert.ok(
+    heroBlock.includes('如果它翻得动'),
+    '首屏必须留出"翻不动"的可能，不能承诺一定能找到临界点',
+  );
+
   // 反向：首屏绝不能**承诺**成功率/胜率。
   // 注意要放过否定语境——"不是成功率"这句是正当的免责声明，
   // 而且必须保留（V9 要求高风险边界不能删）。
-  const heroStart = HTML.indexOf('<section class="hero');
-  const heroBlock = HTML.slice(heroStart, HTML.indexOf('id="examples"', heroStart));
   const withoutNegation = heroBlock.replace(/不是[^。；]*?(成功率|胜率)[^。；]*/g, '');
   assert.ok(!/成功率|胜率/.test(withoutNegation),
     '首屏不得承诺成功率/胜率（否定语境如"不是成功率"允许）');
