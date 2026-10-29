@@ -52,18 +52,63 @@ function isFiniteNumber(v) {
   return typeof v === 'number' && Number.isFinite(v);
 }
 
+const INVISIBLE = new RegExp(
+      '[' +
+        '\\u007F-\\u009F' +   // DEL + C1 控制字符
+        '\\u00AD' +           // 软连字符
+        '\\u115F' +           // 韩文初声填充符
+        '\\u1160' +           // 韩文中声填充符
+        '\\u17B4\\u17B5' +    // 高棉元音固有符号
+        '\\u180B-\\u180E' +   // 蒙古文自由变体选择符
+        '\\u200B-\\u200F' +   // 零宽空格/连接符/方向标记
+        '\\u202A-\\u202E' +   // 方向格式字符
+        '\\u2060-\\u2064' +   // word joiner 等不可见运算符
+        '\\u206A-\\u206F' +   // 已弃用的格式字符
+        '\\u2800' +           // 盲文空白
+        '\\u3164' +           // 韩文填充符
+        '\\uFEFF' +           // BOM / 零宽不换行空格
+        '\\uFFA0' +           // 半角韩文填充符
+        '\\uFFF0-\\uFFF8' +   // 特殊字符
+        ']',
+      'gu',
+    );
+
 function requireText(value, code, field, max = MAX_LABEL, details = {}) {
   if (typeof value !== 'string') {
     fail(code, `${field} 必须是文本`, { field, received: typeof value, ...details });
   }
-  const text = value.trim();
-  if (text.length === 0) {
-    fail(code, `${field} 不能为空`, { field, ...details });
+
+  // 必须**先清洗不可见字符**再 trim，否则零宽字符能当名字。
+  //
+  // 历史缺陷（边界压测 BUG-01/02）：原来只 `value.trim()`。
+  // 于是 '\u200B'（零宽空格）、'\u200C'、'\u2060'、'\u3164'、'\u2800'、'\u00AD'
+  // 全都能通过校验 —— 因为它们不是空白，trim() 不会动它们。
+  // 后果：贡献表出现空白行、翻转列表出现空白项、
+  // 验证卡问"你在「　　　」上…"，而界面上**什么都看不见**。
+  //
+  // 注意：这里**不能**用 labelKey 那套完整归一化（含 NFKC + 空格折叠），
+  // 因为那会改变用户看得见的文字（比如全角转半角、连续空格折叠）。
+  // 只删「真正不可见」的字符，用户能看见的字一个都不动。
+  // 只删「真正不可见」的字符。
+  // **不能**把 TAB / 换行 / 空格这类"可视为分隔符"的字符删掉 ——
+  // 否则「发展 空间」和「发展\t空间」会被清洗成两个不同的值，
+  // 反而是重名校验会漏掉它们（这是踩过的坑，两条 core 测试守着）。
+  // 所以 INVISIBLE 里已经排除了 TAB/LF/CR，这里也不额外动它们。
+  const cleaned = value
+    .replace(INVISIBLE, '')
+    // 兜底：格式类（Cf，零宽/方向标记）与未分配/私用/代理字符直接删；
+    // 控制类（Cc）里只保留 TAB/LF/CR/FF/VT，其余删掉。
+    .replace(/[\p{Cf}\p{Co}\p{Cs}\p{Cn}]/gu, '')
+    .replace(/[\p{Cc}]/gu, (ch) => (ch === '\t' || ch === '\n' || ch === '\r' || ch === '\f' || ch === '\v' ? ch : ''))
+    .trim();
+
+  if (cleaned.length === 0) {
+    fail(code, `${field} 不能为空（只输入了不可见字符也不算）`, { field, ...details });
   }
-  if (text.length > max) {
-    fail(code, `${field} 过长（上限 ${max} 字）`, { field, length: text.length, max, ...details });
+  if (cleaned.length > max) {
+    fail(code, `${field} 过长（上限 ${max} 字）`, { field, length: cleaned.length, max, ...details });
   }
-  return text;
+  return cleaned;
 }
 
 /**
@@ -150,26 +195,7 @@ export function normalizeInput(raw) {
     //   先去掉所有已知空白/格式/控制/filler 类，再用 \p{C} + \p{Z} 兜底。
     //
     // 不合并大小写：中文场景无意义；英文场景里 Growth 和 growth 可能是有意区分。
-    const INVISIBLE = new RegExp(
-      '[' +
-        '\\u007F-\\u009F' +   // DEL + C1 控制字符
-        '\\u00AD' +           // 软连字符
-        '\\u115F' +           // 韩文初声填充符
-        '\\u1160' +           // 韩文中声填充符
-        '\\u17B4\\u17B5' +    // 高棉元音固有符号
-        '\\u180B-\\u180E' +   // 蒙古文自由变体选择符
-        '\\u200B-\\u200F' +   // 零宽空格/连接符/方向标记
-        '\\u202A-\\u202E' +   // 方向格式字符
-        '\\u2060-\\u2064' +   // word joiner 等不可见运算符
-        '\\u206A-\\u206F' +   // 已弃用的格式字符
-        '\\u2800' +           // 盲文空白
-        '\\u3164' +           // 韩文填充符
-        '\\uFEFF' +           // BOM / 零宽不换行空格
-        '\\uFFA0' +           // 半角韩文填充符
-        '\\uFFF0-\\uFFF8' +   // 特殊字符
-        ']',
-      'gu',
-    );
+    
     const labelKey = label
       .normalize('NFKC')
       // 顺序很重要：

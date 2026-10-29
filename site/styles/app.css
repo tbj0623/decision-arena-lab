@@ -2529,7 +2529,16 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
 .flip-item[data-state="infeasible"] .flip-badge { color: var(--ink-3); background: var(--bg-sunk); }
 
 /* 零权重一行给个淡底，方便在表里一眼认出"这行没参与计算" */
-.contrib-table tr:has(.zero-weight-tag) { background: var(--bg-sunk); }
+/* 零权重一行给个淡底，方便在表里一眼认出"这行没参与计算"
+   ── 特异性修复（跨浏览器审计 P3）──
+   原写法 `.contrib-table tr:has(...)` 特异性 (0,1,2)，
+   低于上面 `.contrib-table tbody tr:nth-child(even)` 的 (0,2,3)，
+   于是**偶数行的零权重行不会高亮** —— 所有浏览器表现一致，不是兼容性问题。
+   补上 tbody 和 :not(nth-child) 的显式覆盖。 */
+.contrib-table tbody tr:has(.zero-weight-tag),
+.contrib-table tbody tr:has(.zero-weight-tag):nth-child(even) {
+  background: var(--bg-sunk);
+}
 
 /* ---------- 新增：跳到精确临界点 ---------- */
 .flip-jump { margin-top: .7rem; }
