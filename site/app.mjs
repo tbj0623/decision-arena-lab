@@ -1035,8 +1035,28 @@ function bindEvents() {
     btn.addEventListener('click', () => {
       const ws = $('#workspace');
       if (ws) ws.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
+
       const opA = $('#option-a');
-      if (opA && !opA.value) setTimeout(() => opA.focus({ preventScroll: true }), 400);
+      if (!opA) return;
+
+      // 历史缺陷（ux-writer F-08，product-owner 定位根因，已修）：
+      // 这里原本用一个「值为空才聚焦」的裸判空条件，但 #option-a 的初始值是 "方案 A"
+      // 而不是空串 —— 那个条件**恒为假**，
+      // 这个 focus 分支从上线起就没有对任何人生效过。
+      // 用户点「自己开始」后页面滚到决策台，光标却还停在按钮上，敲键盘没反应。
+      //
+      // 现在的判据：只有 input 里还是**默认占位名**时才聚焦并全选，
+      // 这样已经把方案名改过的用户不会被抢走焦点，也不会被全选覆盖。
+      const DEFAULT_A = '方案 A';
+      const isPlaceholder = opA.value === '' || opA.value === DEFAULT_A;
+      if (!isPlaceholder) return;
+
+      // 400ms 等滚动动画结束再聚焦，避免浏览器把页面又滚回去
+      setTimeout(() => {
+        opA.focus({ preventScroll: true });
+        // 仅当仍是默认占位名时全选 —— 用户直接输入就能覆盖，省一次删除
+        if (opA.value === '方案 A') opA.select();
+      }, prefersReducedMotion() ? 0 : 400);
     });
   }
 

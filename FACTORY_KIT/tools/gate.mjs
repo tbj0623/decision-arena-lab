@@ -157,7 +157,13 @@ export const GATES = [
         //
         // 注意：匹配结果可能带上 Markdown 反引号/引号/标点（`C:\Users\xxx\`` ），
         // 判断前必须先把这些"包裹字符"剥掉，否则占位符识别不出来。
-        const PLACEHOLDER_SEGMENTS = /^(xxx+|user(name)?|用户名|你的用户名|your[-_]?name|<.*>|\.\.\.)$/i;
+        //
+        // 判定思路（不要用"列举所有占位词"——那永远漏，今晚已经漏了三次）：
+        //   真实用户名几乎总是 ASCII 字母数字下划线，或者是常见中文姓名。
+        //   占位符则是"明显不像人名"的东西：xxx / your-name / 名字 / 用户名 / <...>。
+        // 所以这里改成「看起来像占位」的正向判定 + 「看起来像真人名」的反向排除。
+        const PLACEHOLDER_SEGMENTS =
+          /^(x{2,}|X{2,}|user(name)?|your[-_ ]?(name|username)?|名字|你的名字|用户名|你的用户名|账户名|<.*>|\.{2,}|example|placeholder)$/i;
         const stripWrapping = (s) => s.replace(/^[`'"([{<]+/, '').replace(/[`'"\])}>,.;:]+$/, '');
 
         const hits = [];

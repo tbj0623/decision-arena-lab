@@ -1253,3 +1253,50 @@ test('有意义的区分不应误伤（括号 / 大小写）', () => {
   // 不合并大小写是刻意的：中文场景无意义，英文场景可能是有意区分
   assert.doesNotThrow(() => normalizeInput(mkFactors(['Growth', 'growth', '丙', '丁'])));
 });
+
+/* ─────────────────────────────────────────────────────────────
+ * 回归：Unicode 空白/填充符不得绕过重名校验（red-team W06-02 发现）
+ *
+ * 只剥 \p{Cf} 不够。实测仍有 4 类能绕过，且都不是 Cf 类别：
+ *   U+3164 韩文填充符（视觉完全空白）
+ *   U+115F 韩文初声填充符
+ *   U+2800 盲文空白（视觉空白）
+ *   U+0000 NUL（控制字符）
+ * 它们都能让两个视觉相同的因素名通过校验，原 bug 原样复现。
+ * ───────────────────────────────────────────────────────────── */
+const UNICODE_INVISIBLES = [
+  ['U+3164 韩文填充符', '\u3164'],
+  ['U+115F 韩文初声填充符', '\u115F'],
+  ['U+2800 盲文空白', '\u2800'],
+  ['U+0000 NUL', '\u0000'],
+  ['U+200B 零宽空格', '\u200B'],
+  ['U+00AD 软连字符', '\u00AD'],
+  ['U+3000 全角空格', '\u3000'],
+  ['U+00A0 不换行空格', '\u00A0'],
+  ['U+FEFF BOM', '\uFEFF'],
+  ['U+2060 word joiner', '\u2060'],
+];
+
+for (const [name, ch] of UNICODE_INVISIBLES) {
+  test(`不可见字符 ${name} 不得绕过重名校验`, () => {
+    assert.throws(
+      () => normalizeInput(mkFactors(['发展空间', '发展空间' + ch, '丙', '丁'])),
+      (e) => e.code === 'DUPLICATE_FACTOR_LABEL',
+      `${name} 绕过了重名校验`,
+    );
+  });
+}
+
+test('分隔符类字符统一折叠后再判重（tab / 多空格）', () => {
+  // 注意：这类字符属"分隔符"语义，应替换成空格而不是删除。
+  // 早先误把 TAB 归到"删除"一步，导致「发展 空间」vs「发展\t空间」变成两个不同值。
+  assert.throws(() => normalizeInput(mkFactors(['发展 空间', '发展\t空间', '丙', '丁'])),
+    (e) => e.code === 'DUPLICATE_FACTOR_LABEL');
+  assert.throws(() => normalizeInput(mkFactors(['发展 空间', '发展  空间', '丙', '丁'])),
+    (e) => e.code === 'DUPLICATE_FACTOR_LABEL');
+});
+
+test('归一化不得误伤有意义的区分', () => {
+  assert.doesNotThrow(() => normalizeInput(mkFactors(['发展空间（技术）', '发展空间（管理）', '丙', '丁'])));
+  assert.doesNotThrow(() => normalizeInput(mkFactors(['Growth', 'growth', '丙', '丁'])));
+});
