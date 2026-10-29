@@ -729,6 +729,18 @@ function renderFlip(analysis, thresholds, flip) {
 
   box.append(buildThresholdList(thresholds));
 
+  // 一句澄清（logic-engineer 的观察）：
+  // 当所有因素都"可翻转"时（如 rent 4/4、longdist 5/5），列表会有好几条。
+  // 用户很容易读成"有 5 条独立的行动建议"。
+  // 但数学上它们是**同一个结论的 5 种撬法**——任何一条做到，结论都会翻。
+  // 不澄清的话，用户会以为要同时满足所有条件，反而更焦虑。
+  if (feasibleCount(thresholds) >= 3) {
+    box.append(el('p', {
+      class: 'flip-note',
+      text: '上面几条不是"要同时满足的条件"，而是"随便做到哪一条都能翻"——挑你觉得最容易做到的那条去验证就行。',
+    }));
+  }
+
   if (flip) {
     const block = buildFlipSlider(flip);
     if (block) box.append(block);
@@ -777,6 +789,11 @@ function flipDescription(flip, analysis) {
     return `最容易被撬动的是「${flip.label}」：它的权重占比约到 ${thr}（精确 ${holdPrecise}）时两边打平；再往上就翻过来了。${scope}`;
   }
   return `最容易被撬动的是「${flip.label}」：它的权重占比约降到 ${thr}（精确 ${holdPrecise}）时两边打平；再往下就翻过来了。${scope}`;
+}
+
+/** 数一下有几个"可翻转"的阈值（用于决定要不要加澄清说明） */
+function feasibleCount(thresholds) {
+  return thresholds.filter((t) => t.feasible).length;
 }
 
 function buildThresholdList(thresholds) {

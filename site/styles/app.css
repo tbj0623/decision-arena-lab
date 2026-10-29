@@ -2721,3 +2721,17 @@ main:focus:not(:focus-visible) {
 @media (max-width: 620px) {
   :root { --header-h: 68px; }
 }
+
+/* 翻转列表的澄清说明（logic-engineer 的观察）
+   多条"可翻转"不是要多条件同时满足，而是任一条都能翻。
+   不加说明用户会误读成"5 条必须全做到"。 */
+.flip-note {
+  margin: .55rem 0 0;
+  padding: .5rem .65rem;
+  font-size: .82rem;
+  line-height: 1.55;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--mint) 8%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--mint) 45%, transparent);
+  border-radius: 0 6px 6px 0;
+}
