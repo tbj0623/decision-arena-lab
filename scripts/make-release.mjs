@@ -19,11 +19,16 @@ const ZIP_PATH = join(DIST, ZIP_NAME);
 
 /** 白名单：只打包这些顶层目录/文件 */
 const INCLUDE = [
-  'site', 'tests', 'scripts', 'docs', 'FACTORY_KIT', 'marketing',
-  'README.md', 'LICENSE', '.github',
+  'site', 'tests', 'scripts', 'docs',
+  // README.md 里第一行就链到 README.en.md、正文链到 CONTRIBUTING.md，
+  // 少打包任何一个，包里的链接就是断的（可维护性审查发现）。
+  'README.md', 'README.en.md', 'CONTRIBUTING.md', 'LICENSE', '.github',
+  // 注意：FACTORY_KIT（多智能体流程手册）和 marketing（草稿素材）
+  // **不再进发行包** —— 它们是内部资料，混进产品包会让下载者困惑
+  // "这到底是个工具还是一套方法论"。它们仍在仓库里，只是不随包发。
 ];
 /** 永不打包 */
-const EXCLUDE_NAMES = new Set(['node_modules', '.git', '.DS_Store', 'Thumbs.db', 'work', 'reports', 'dist', 'ops', '_internal', 'proposals']);
+const EXCLUDE_NAMES = new Set(['node_modules', '.git', '.DS_Store', 'Thumbs.db', 'work', 'reports', 'dist', 'ops', '_internal', 'proposals', 'FACTORY_KIT', 'marketing']);
 const EXCLUDE_EXT = new Set(['.zip', '.log', '.bak']);
 
 /**

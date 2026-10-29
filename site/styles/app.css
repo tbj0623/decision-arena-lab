@@ -260,8 +260,12 @@ input[type="range"]:focus-visible { outline-offset: 4px; }
   position: absolute;
   left: 8px; top: -68px;
   z-index: 100;
+  /* 深色模式下 --brand 会翻成薄荷浅色 #8fe3d0，白字就糊了（1.49:1，WCAG 硬违规）。
+     改用 --bg（深色时是深navy）当文字色 —— 与薄荷背景形成 11.78:1。
+     浅色模式下 --bg 是浅色，用在 --brand(#0a3a52 深色) 上同样是高对比。 
+     即：**文字色和背景色永远是一对反色**，不依赖主题翻不翻。 */
   background: var(--brand);
-  color: #fff;
+  color: var(--bg);
   padding: .7em 1.2em;
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
   font-weight: 600;

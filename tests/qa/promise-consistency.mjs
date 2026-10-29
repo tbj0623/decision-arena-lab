@@ -64,7 +64,7 @@ function check(id, promise, method, pass, detail) {
 /* ── 3. 「占比加起来一定是 100%」 ── */
 {
   // 这一条今晚就是被测出 100.2% 的那个。现在用 4/5/6 因素 × 多种权重组合验证。
-  const { scoreDecision } = await import('../site/core.mjs');
+  const { scoreDecision } = await import('../../site/core.mjs');
   const bad = [];
   for (const n of [4, 5, 6]) {
     for (const w of [1, 2, 3, 5, 7]) {
@@ -134,7 +134,7 @@ function check(id, promise, method, pass, detail) {
 {
   const htmlHasFormula = /Σw|w<sub>|p<sub>/.test(HTML);
   // 公开的公式必须真的能复现界面上的数字
-  const { scoreDecision } = await import('../site/core.mjs');
+  const { scoreDecision } = await import('../../site/core.mjs');
   const input = {
     title: 't',
     options: [{ id: 'A', label: 'A' }, { id: 'B', label: 'B' }],
@@ -162,7 +162,7 @@ function check(id, promise, method, pass, detail) {
 
 /* ── 5. 「这些是编出来的场景」 ── */
 {
-  const { EXAMPLES } = await import('../site/features/narrative.mjs');
+  const { EXAMPLES } = await import('../../site/features/narrative.mjs');
   // 真实品牌黑名单（本项目自己声明过"不出现真实品牌"）
   const BRANDS = /MacBook|ThinkPad|Apple|Lenovo|iPhone|华为|小米|耐克|Nike|Adidas|星巴克|Starbucks/i;
   const bad = [];

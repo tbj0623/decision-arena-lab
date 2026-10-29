@@ -141,7 +141,8 @@ function renderExamples() {
       el('span', { class: 'ex-tag', text: ex.tag }),
       el('strong', { text: ex.title }),
       el('span', { class: 'ex-blurb', text: ex.blurb }));
-    grid.append(card);
+    // 用 <li> 提供列表项语义，<button> 保持按钮语义 —— 两者不冲突。
+    grid.append(el('li', { class: 'example-item' }, card));
   }
 }
 
