@@ -28,6 +28,9 @@
 > Auto-merging site/app.mjs
 > ```
 >
+> 另外 **`git push` 也通了**（用 `node work/push-git.mjs`，见「一」里的注意事项），
+> 本地分支已与远端对齐：`main` = 远端 main = `b370698`，47 个提交。
+>
 > **所以：回滚现在优先用「一、最简回滚（git revert）」，它是首选路径。**
 > 「二」及以后的 API 取文件方案降级为**兜底**（万一以后网络又断）。
 > ══════════════════════════════════════════════════════════════════
@@ -61,9 +64,12 @@ node work/push-incremental.mjs
 
 **注意两点：**
 
-1. `git push` 直连仍会在认证环节挂住（实测 `--dry-run` 卡住），
-   **推送继续用 `node work/push-incremental.mjs`**。它推送后会断言
-   `远端 tree === 本地 HEAD tree`，不等就报错。
+1. **推送用 `node work/push-git.mjs`**（2026-10-30 06:10 起可用）。
+   它把 `gh auth token` 拼进远程 URL 后调 `git push`，秒级完成、历史连续。
+   （本机 git 没配 credential helper，裸 `git push` 会卡在认证环节。）
+   兜底仍是 `node work/push-incremental.mjs`（走 API，几分钟，不需 push 通道，
+   推完断言 `远端 tree === 本地 HEAD tree`）。
+   ⚠️ 本机网络**间歇性抖动**：`api.github.com` 会突然连不上几分钟。失败就重试。
 2. revert 之后**必须复测**：`node --test` + 在浏览器里点一遍
    （首屏「跳到打平点」、9 个示例、「跳到精确临界点」、评分输入失焦生效）。
    这个项目有过「撤销 A 导致 B 回退」的记录。

@@ -1,6 +1,6 @@
 # Decision Arena V9 — 最终交付报告
 
-> 定稿：2026-10-30 06:00 CST · 版本 v9.33
+> 定稿：2026-10-30 06:00 CST · 版本 v9.34
 > 线上：**https://tbj0623.github.io/decision-arena-lab/**
 > 测试：**215 pass / 0 fail / 0 todo**
 
@@ -255,10 +255,37 @@ Auto-merging site/app.mjs              （试跑后已 --abort，未产生提交
 `docs/release/ROLLBACK_V9.md` 已重写：`git revert` 升为首选，
 旧的 API 方案降级为兜底，并注明"网络再断时用"。
 
-### 仍然不行的一件
-`git push` 直连会在认证环节挂住（`--dry-run` 实测卡死），
-**推送继续用 `node work/push-incremental.mjs`**（它会断言
-`远端 tree === 本地 HEAD tree`）。这一点已写进回滚文档。
+### 推送也通了
+本机 git 没配 credential helper，裸 `git push` 会卡在认证环节。
+把 `gh auth token` 拼进远程 URL 就正常了 —— 已封装成 `node work/push-git.mjs`：
+
+```text
+$ node work/push-git.mjs --dry-run
+   06b552b..b370698  HEAD -> main
+✓ dry-run 通过
+
+$ node work/push-git.mjs
+✓ 远端 main = b370698（与本地一致）
+```
+
+推送从「走 API 逐文件重建 tree、几分钟」变成「git push、几秒」。
+兜底保留 `push-incremental.mjs`（网络抖动时它不需要 push 通道）。
+
+### 分支也对齐了
+本地原本有个 `main` 停在 v1.0.0（`16052d0`，孤立根），和远端是完全无关的历史。
+现在：`git checkout -B main b370698` 把本地 main 指向最新提交，
+旧的 v1.0.0 用 tag `legacy-main-v1.0.0` 留档。
+```text
+$ git branch -v
+* main     b370698 docs(v9.33): 网络恢复后的两项收尾
+  night-v8 7cb5ec5 fix(v1.1.3): 打平矛盾三修 + VERSION 更正
+
+$ git rev-list --count HEAD
+47
+```
+
+⚠️ **本机网络是间歇性抖动的** —— 实测 06:00 通、06:04 断（`api.github.com` 连不上）、
+06:07 又通。所以推送失败先重试，不要怀疑代码。
 
 ---
 
