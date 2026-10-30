@@ -281,3 +281,85 @@ test('M15 首屏判定文案有独立 aria-live 区，且不逐帧播报', async
   assert.match(appCode, /requestAnimationFrame/, '缺少强制 DOM 变更的播报实现');
   assert.match(appCode, /if \(announce\)/, '缺少"只在松手时播报"的开关');
 });
+
+/* ───────── M16–M19：可见文案（叙事模板 + 结构守门）───────── */
+
+// 这两个用例来自 V10 复核时的真实复现（界面允许的 0.5 步进即可输入），
+// 关键在于它们**显示同分、原始不同、且没有可行翻转阈值** —— 最容易写出自相矛盾文案的场景。
+const CASE_Y = {
+  title: 'probe',
+  options: [{ label: 'A方案' }, { label: 'B方案' }],
+  factors: [0, 1, 2, 3].map((i) => ({
+    id: `f${i + 1}`,
+    label: `因素${i + 1}`,
+    weight: [0.5, 10, 10, 10][i],
+    ratings: { A: [5, 5, 5, 5.5][i], B: [4.5, 5, 5, 5.5][i] },
+  })),
+};
+const CASE_X = {
+  title: 'probe',
+  options: [{ label: 'A方案' }, { label: 'B方案' }],
+  factors: [0, 1, 2, 3].map((i) => ({
+    id: `f${i + 1}`,
+    label: `因素${i + 1}`,
+    weight: [0.5, 10, 10, 10][i],
+    ratings: { A: [5, 8, 5, 5][i], B: [4.5, 7.5, 5.5, 5][i] },
+  })),
+};
+
+test('M16 案例 Y（显示同分 + 无可行阈值）：叙事文案不得说「完全打平」「领先 0.1」', async () => {
+  const { buildViewpoints } = await import('../../site/features/narrative.mjs');
+  const analysis = scoreDecision(CASE_Y);
+  assert.equal(tieLevelOf(analysis), 'display', '案例 Y 的前提是 display 级同分');
+  assert.equal(shownGapOf(analysis), '0.0');
+  const thresholds = findFlipThresholds(CASE_Y);
+  assert.equal(pickFlipHighlight(thresholds), null, '案例 Y 应当是"没有可翻转阈值"');
+  const vp = buildViewpoints(analysis, null, null);
+  // 主持者句：必须说显示精度，不能说"完全打平"，也不能报出用户看不到的"领先 0.1 分"
+  assert.match(vp.chair.text, /显示为相同分数/, vp.chair.text);
+  assert.equal(/完全打平/.test(vp.chair.text), false, `主持者句把显示同分说成了完全打平：${vp.chair.text}`);
+  assert.equal(/领先的/.test(vp.chair.text), false, `主持者句报出了用户看不到的差值：${vp.chair.text}`);
+  // 反方论据：f1 是 5 对 4.5，不能断言"所有因素两边分数都一样"
+  assert.equal(/所有因素两边分数都一样/.test(vp.oppose.text), false, `反方论据失实：${vp.oppose.text}`);
+  assert.match(vp.oppose.text, /四舍五入/, vp.oppose.text);
+});
+
+test('M17 案例 X（显示同分 + 有可行阈值）：不得说「翻不过来」，且要区分显示/精确', async () => {
+  const { buildViewpoints } = await import('../../site/features/narrative.mjs');
+  const analysis = scoreDecision(CASE_X);
+  assert.equal(tieLevelOf(analysis), 'display');
+  const thresholds = findFlipThresholds(CASE_X);
+  const flip = pickFlipHighlight(thresholds);
+  assert.ok(flip, '案例 X 应当能挑出可翻转的因素');
+  const vp = buildViewpoints(analysis, flip, null);
+  assert.equal(/翻不过来/.test(vp.chair.text), false, `有可行阈值却说翻不过来：${vp.chair.text}`);
+  // 屏幕上已经是同一个数了，必须说明"下面讲的是精确打平点"，否则用户会以为现在没打平
+  assert.match(vp.chair.text, /原始计算还差/, vp.chair.text);
+});
+
+test('M18 精确同分仍保留 exact 措辞（不因 display 分支把精确场景弱化）', async () => {
+  const { buildViewpoints } = await import('../../site/features/narrative.mjs');
+  const flat = {
+    title: 't',
+    options: [{ label: 'A' }, { label: 'B' }],
+    factors: [0, 1, 2, 3].map((i) => ({ id: `f${i + 1}`, label: `f${i + 1}`, weight: 3, ratings: { A: 5, B: 5 } })),
+  };
+  const analysis = scoreDecision(flat);
+  assert.equal(tieLevelOf(analysis), 'exact');
+  const vp = buildViewpoints(analysis, pickFlipHighlight(findFlipThresholds(flat)), null);
+  assert.match(vp.chair.text, /完全打平/, vp.chair.text);
+  assert.equal(/四舍五入/.test(vp.chair.text), false, `精确同分不该出现四舍五入的说法：${vp.chair.text}`);
+});
+
+test('M19 app.mjs 三处越界已收口（临界点提示/读屏 winner/翻转卡断言）', async () => {
+  const code = stripComments(await readFile(APP, 'utf8'));
+  // ①「就在临界点上」只能给精确同分
+  assert.match(code, /const near = isExactTie \?/, '临界点提示仍按显示同分判定');
+  assert.equal(/const near = isDisplayTie/.test(code), false);
+  // ② 读屏的"当前更倾向"不得与可见区的打平结论相反
+  assert.match(code, /winnerTieLevel === 'none' && analysis\.winner === row\.side/);
+  // ③ 翻转卡的"评分完全一样"必须有真实判据，不能只看 anyFeasible
+  assert.match(code, /const allGapsZero = /, '翻转卡仍可能无凭据断言"评分完全一样"');
+  // ④ 分享摘要的 display 免责句必须独立存在（不被 lastFlip 分支短路）
+  assert.match(code, /tieLevelOf\(lastAnalysis\) === 'display'/, '分享摘要缺少 display 级免责句');
+});

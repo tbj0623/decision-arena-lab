@@ -667,9 +667,12 @@ function renderScores(analysis) {
     { side: 'B', label: analysis.options[1].label, score: analysis.scoreB },
   ];
 
+  // 读屏也要遵守同分两级规则：display 级时可见区说"打平"，
+  // 这一行就不能还播"当前更倾向这一项" —— 否则视障用户听到的和屏幕显示相反。
+  const winnerTieLevel = tieLevelOf(analysis);
   for (const row of rows) {
     const width = Math.max(0, Math.min(100, row.score));
-    const isWinner = analysis.winner === row.side;
+    const isWinner = winnerTieLevel === 'none' && analysis.winner === row.side;
     box.append(el('div', { class: 'score-row', dataset: { side: row.side } },
       el('div', { class: 'score-row-head' },
         el('span', { class: 'score-name', text: row.label }),
@@ -841,11 +844,20 @@ function renderFlip(analysis, thresholds, flip) {
         ? '现在两边分数完全相同——这是最容易翻过去的状态。'
         : '现在两边显示为相同分数（四舍五入到 1 位小数），原始计算存在细微差异——这同样是最容易被翻过去的状态。',
     }));
+    // "没有杠杆"的真正判据是**每个因素的 delta 都是 0**，
+    // 不能因为 anyFeasible=false 就断言"评分完全一样"。
+    // 反例（V10 复核，界面允许的 0.5 步进即可复现）：
+    //   权重 0.5/10/10/10，评分 A 5,5,5,5.5 对 B 4.5,5,5,5.5
+    //   → 分数 51.64 / 51.56，显示同分 51.6/51.6，四个阈值全是 BOUNDARY。
+    //   f1 是 5 对 4.5，旧文案却硬说"评分完全一样"。
+    const allGapsZero = (analysis.contributions || []).every((c) => Math.abs(c.delta) < TIE_EPSILON);
     box.append(el('p', {
       class: 'result-empty',
       text: anyFeasible
         ? '任何一点权重变化都会立刻让某一边领先。所以此刻真正该问的不是"怎么调权重"，而是"我对哪一项最没把握"——去核实那一项。'
-        : '你给两个方案在每个因素上的评分完全一样，所以调权重不会有任何变化（没有哪一项在往里加分）。真正要做的是先把评分打出差别——去核实事实，而不是纠结权重。',
+        : allGapsZero
+          ? '你给两个方案在每个因素上的评分完全一样，所以调权重不会有任何变化（没有哪一项在往里加分）。真正要做的是先把评分打出差别——去核实事实，而不是纠结权重。'
+          : '两边只差不到显示精度的距离（四舍五入后是同一个数），但每个因素的差距方向一致，所以调单个因素的权重也翻不过来。想改变结论，只能把某一项的评分打出真实差距——去核实事实，别再纠结权重。',
     }));
     box.append(buildThresholdList(thresholds));
 
@@ -1060,7 +1072,11 @@ function buildFlipSlider(flip) {
     if (isDisplayTie) verdictText = isExactTie ? '两边打平（完全相等）' : '两边显示打平';
     else if (projected.difference > 0) verdictText = analysisLabel('A');
     else verdictText = analysisLabel('B');
-    const near = isDisplayTie ? '（就在临界点上）' : '';
+    // 只有**精确**同分才等价于"正好落在临界点"：Δ(t) 是线性的、零点唯一，
+    // display 级（Δ 可达 0.05）离 t* 仍有距离，说"就在临界点上"是失实。
+    // 反例（V10 复核）：屏幕显示 59.8/59.8 时占比 32.79%，
+    // 同一张卡的标题却写临界点在 33.87% —— 自己打自己脸。
+    const near = isExactTie ? '（就在临界点上）' : '';
     clear(live);
     live.append(
       el('span', { text: `权重占比 ${pct(t, 2)}${near}：` }),
@@ -1360,6 +1376,12 @@ function buildShareText() {
   lines.push('两个方案我分别叫 A 和 B（具体是什么就不写在这了）。');
   // 差值必须和页面同源（两个显示分数相减），否则分享出去的数与页面对不上。
   lines.push(`结果：A ${fmt1(lastAnalysis.scoreA)} 分 / B ${fmt1(lastAnalysis.scoreB)} 分（差 ${shownGapOf(lastAnalysis)}）。`);
+  // display 级同分：分享出去的数字是四舍五入后的，必须自带"细微差异"说明。
+  // 否则收件人只看到「差 0.0」，会以为两边精确相等 —— 下面那段阈值句会把
+  // tie 分支的免责句短路掉（那条只在 lastFlip 为空时才出现）。
+  if (tieLevelOf(lastAnalysis) === 'display') {
+    lines.push('（上面两个分数是四舍五入到 1 位小数的显示值，原始计算仍有细微差异。）');
+  }
   lines.push('');
   if (lastFlip) {
     // 精度必须与页面内一致（2 位），否则分享出去的数字说不到做到的事。
