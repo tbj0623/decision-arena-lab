@@ -80,3 +80,39 @@ export function signedShownGap(analysis) {
 export function isExactTieOf(analysis) {
   return tieLevelOf(analysis) === 'exact';
 }
+
+/* ───────── 阈值占比的展示精度 ───────── */
+
+/**
+ * 阈值（临界占比）的展示精度：**2 位**。
+ *
+ * 为什么不能用 1 位（历史 P0，已被真实用户打脸）：
+ * 临界点 t* 一般是无理数级的数，页面早期写"调到 39.4% 两边就会打平"，
+ * 而实测 39.4% 处 Δ = −0.004 —— 承诺兑现不了。1 位小数的粗粒度和
+ * "会不会打平"的量级刚好重叠，所以必须 2 位。
+ */
+export const THRESHOLD_SHARE_DIGITS = 2;
+
+/**
+ * 「精确」形态的精度：**4 位**。与 2 位并列展示（"约 39.39%（精确 39.3939%）"），
+ * 让用户明白 2 位那个数只是近似，不会以为能拖到某一档精确命中。
+ */
+export const THRESHOLD_SHARE_EXACT_DIGITS = 4;
+
+/**
+ * 把 0–1 的占比格式化成阈值文案里的标准形态（2 位小数 + %）。
+ * @param {number} share
+ * @returns {string} 形如 "39.39%"
+ */
+export function fmtThresholdShare(share) {
+  return `${(share * 100).toFixed(THRESHOLD_SHARE_DIGITS)}%`;
+}
+
+/**
+ * 阈值文案里的「精确」形态（4 位小数 + %）。
+ * @param {number} share
+ * @returns {string} 形如 "39.3939%"
+ */
+export function fmtThresholdShareExact(share) {
+  return `${(share * 100).toFixed(THRESHOLD_SHARE_EXACT_DIGITS)}%`;
+}

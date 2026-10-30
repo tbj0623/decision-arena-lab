@@ -21,7 +21,10 @@ import {
   TIE_EPSILON,
 } from './core.mjs';
 
-import { fmt1, tieLevelOf, shownGapOf, signedShownGap } from './precision.mjs';
+import {
+  fmt1, tieLevelOf, shownGapOf, signedShownGap,
+  fmtThresholdShare, fmtThresholdShareExact,
+} from './precision.mjs';
 
 import { EXAMPLES, cloneBody, buildViewpoints, detectHighRisk, highRiskNotice } from './features/narrative.mjs';
 
@@ -982,8 +985,10 @@ function flipDescription(flip, analysis) {
   }
 
   const cur = pct(flip.currentShare, 1);
-  const thr = pct(flip.thresholdShare, 2);
-  const holdPrecise = pct(flip.thresholdShare, 4);
+  // 阈值精度统一走 precision.mjs 的格式化函数（2 位 + 4 位精确），
+  // 不再各处手写 pct(..., 2)：历史上就漏过分享摘要那一处，造成"39.4% 会打平"的假承诺。
+  const thr = fmtThresholdShare(flip.thresholdShare);
+  const holdPrecise = fmtThresholdShareExact(flip.thresholdShare);
 
   if (flip.direction === 'hold') {
     return `「${flip.label}」现在的权重占比 ${cur} 恰好就在打平点附近。此刻两边分数相同——往任一方向拨动都会立刻偏向一方。${scope}`;
@@ -1016,7 +1021,7 @@ function buildThresholdList(thresholds) {
       // 历史缺陷（growth-producer W02-01 发现）：标题行显示「39.39%（精确 39.3939%）」，
       // 这张列表却显示「39.4%」——同一页面两种精度，用户会以为是两个不同的数，
       // 对外素材逐字引用界面时也会因此写错。
-      numText = t.direction === 'hold' ? '已打平' : pct(t.thresholdShare, 2);
+      numText = t.direction === 'hold' ? '已打平' : fmtThresholdShare(t.thresholdShare);
     }
     const item = el('li', { class: 'flip-item', dataset: { state: feasible ? 'feasible' : 'infeasible' } },
       name,
@@ -1036,7 +1041,7 @@ function buildFlipSlider(flip) {
   /** 把给定占比画到界面上：同时更新 output、滑杆拇指位置、实时文案。 */
   const describe = (t, { moveSlider = true } = {}) => {
     const projected = projectAtShare(state, flip.factorId, t);
-    out.value = pct(t, 2);
+    out.value = fmtThresholdShare(t);
     // 关键：滑杆位置必须跟着走，否则界面会同时存在两个矛盾的位置指示（red-team P0-5）
     if (moveSlider) slider.value = String(t * 100);
 
@@ -1048,7 +1053,7 @@ function buildFlipSlider(flip) {
     // 但 aria-valuetext 仍是初始的「28.57%」，aria-label 里也写着"当前 28.57%"。
     // 读屏用户听到的永远是那一开始的值 —— 而视觉用户看到的完全正确。
     // 这类缺陷只有真正用读屏/查 AX tree 才会发现；首屏那根滑杆是对的，只有工作区这根漏了。
-    const pctText = pct(t, 2);
+    const pctText = fmtThresholdShare(t);
     slider.setAttribute('aria-valuetext', pctText);
     // aria-label 里嵌了当前值，也必须同步，否则读屏会念出两个不同的数
     slider.setAttribute('aria-label', `「${flip.label}」的权重占比（0–100%，当前 ${pctText}）`);
@@ -1079,7 +1084,7 @@ function buildFlipSlider(flip) {
     const near = isExactTie ? '（就在临界点上）' : '';
     clear(live);
     live.append(
-      el('span', { text: `权重占比 ${pct(t, 2)}${near}：` }),
+      el('span', { text: `权重占比 ${fmtThresholdShare(t)}${near}：` }),
       el('strong', { text: `A ${fmt1(projected.scoreA)} / B ${fmt1(projected.scoreB)}` }),
       // 同源修复（见首屏注释）：差值用两个**显示出来的**分数相减
     el('span', { text: `，${verdictText}（差 ${Math.abs(Number(fmt1(projected.scoreA)) - Number(fmt1(projected.scoreB))).toFixed(1)}）` }));
@@ -1150,7 +1155,7 @@ function buildFlipSlider(flip) {
     ),
     el('label', { for: sliderId },
       el('span', {}, '亲手拨一下：把「', el('strong', { text: flip.label }), '」的权重占比拖到 ',
-        pct(flip.thresholdShare, 2), ' 附近看看')),
+        fmtThresholdShare(flip.thresholdShare), ' 附近看看')),
     // <output> 在 <label> 之外：它是当前值的显示，不是控件名字的一部分
     out,
     slider,
@@ -1404,8 +1409,8 @@ function buildShareText() {
     // 只会得出"这工具算错了"，而作者不在场无法澄清。
     //
     // 措辞也学页面内的 flipDescription：说"约 X（精确 Y）"，不声称某个两位小数值能精确命中。
-    const sharePct = pct(lastFlip.thresholdShare, 2);
-    const shareExact = pct(lastFlip.thresholdShare, 4);
+    const sharePct = fmtThresholdShare(lastFlip.thresholdShare);
+    const shareExact = fmtThresholdShareExact(lastFlip.thresholdShare);
     lines.push(`最关键的一条：把「${lastFlip.label}」的权重占比调到约 ${sharePct}（精确 ${shareExact}），两边就会打平，再越过就翻过来。`);
   } else {
     // lastFlip 为 null 有**三种**不同情况，不能一律说"方向一致"。

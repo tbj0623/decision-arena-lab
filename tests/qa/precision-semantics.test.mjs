@@ -29,6 +29,10 @@ import {
   shownGapOf,
   signedShownGap,
   isExactTieOf,
+  fmtThresholdShare,
+  fmtThresholdShareExact,
+  THRESHOLD_SHARE_DIGITS,
+  THRESHOLD_SHARE_EXACT_DIGITS,
 } from '../../site/precision.mjs';
 import {
   TIE_EPSILON,
@@ -384,4 +388,33 @@ test('M20 跳到临界点被上限截断：先报「调不到」再谈同分，�
   // 和紧邻的"并没有精确打平"自相矛盾。
   assert.equal(/仍差 \$\{shownGapOf\(actual\)\}/.test(block), false, '截断提示用了显示差值（会写成"仍差 0.0 分"）');
   assert.match(block, /仍差 \$\{fmt1\(Math\.abs\(actual\?\.difference \?\? 0\)\)\}/, '截断提示没有使用原始差值');
+});
+
+/* ───────── M21：阈值展示精度（历史 P0：1 位小数会造成假承诺）───────── */
+
+test('M21 阈值展示必须是 2 位小数，且另给 4 位"精确"值', async () => {
+  // 历史 P0：页面写"调到 39.4% 两边就会打平"，而 39.4% 处实测 Δ=−0.004 —— 根本没打平。
+  // 1 位小数的粗粒度和"会不会打平"的量级刚好重叠，所以精度本身是正确性的一部分。
+  assert.equal(THRESHOLD_SHARE_DIGITS, 2, '阈值展示精度必须是 2 位');
+  assert.equal(THRESHOLD_SHARE_EXACT_DIGITS, 4, '"精确"形态必须是 4 位');
+
+  const sample = 0.3939393939;
+  assert.equal(fmtThresholdShare(sample), '39.39%');
+  assert.equal(fmtThresholdShareExact(sample), '39.3939%');
+  // 反面：1 位小数的形态确实会丢掉"会不会打平"的区别
+  assert.equal(`${(sample * 100).toFixed(1)}%`, '39.4%');
+  assert.notEqual(fmtThresholdShare(sample), `${(sample * 100).toFixed(1)}%`);
+
+  // 所有输出都必须是「数字 + 2 位/4 位小数 + %」
+  for (const s of [0, 0.01, 0.5, 0.9999, 0.108695652]) {
+    assert.match(fmtThresholdShare(s), /^\d+\.\d{2}%$/);
+    assert.match(fmtThresholdShareExact(s), /^\d+\.\d{4}%$/);
+  }
+
+  // 界面不得再手写阈值精度：必须走这两个函数（历史 P0 就是"9 处传了、分享那处漏了"）
+  const code = stripComments(await readFile(APP, 'utf8'));
+  assert.equal(/pct\([^)]*thresholdShare/.test(code), false, '仍有手写 pct(thresholdShare, N)');
+  assert.equal(/pct\(t,\s*2\)/.test(code), false, '仍有手写 pct(t, 2)');
+  assert.ok((code.match(/fmtThresholdShare\(/g) || []).length >= 4, 'fmtThresholdShare 调用点太少');
+  assert.ok(/fmtThresholdShareExact\(/.test(code), '缺少"精确"形态的使用');
 });

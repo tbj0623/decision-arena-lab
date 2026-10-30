@@ -202,9 +202,8 @@ test('UI 契约：分享摘要里的百分比必须传精度，且不得声称�
     .replace(/\/\*[\s\S]*?\*\//g, '')   // 块注释
     .replace(/(^|[^:])\/\/.*$/gm, '$1'); // 行注释（避开 http:// 这类）
 
-  // 找出所有 pct(...) 调用，检查是否传了第二个参数
+  // 找出所有仍然存在的 pct(...) 调用 —— 有的话必须显式传第二个参数。
   const calls = [...fn.matchAll(/pct\(([^)]*)\)/g)].map((m) => m[0]);
-  assert.ok(calls.length > 0, 'buildShareText 应当至少调用一次 pct()');
 
   const missingDigits = calls.filter((call) => {
     // 数一下顶层逗号：没有逗号 = 只传了一个参数
@@ -224,6 +223,18 @@ test('UI 契约：分享摘要里的百分比必须传精度，且不得声称�
     [],
     `buildShareText 里的 pct() 必须显式传精度位数（默认 1 位会让"调到 X% 就打平"说不到做到）：${JSON.stringify(missingDigits)}`,
   );
+
+  // V10 起阈值展示不再手写 pct(..., 2/4)，统一走 precision.mjs 的两个格式化函数。
+  // 历史 P0 的成因就是"页面内 9 处传了精度、唯独分享这一处漏了"——
+  // 只有把精度收进单一函数，才不可能再漏某一处。
+  assert.equal(
+    /pct\([^)]*thresholdShare/.test(fn),
+    false,
+    '分享摘要不得再手写 pct(thresholdShare, N)，必须用 fmtThresholdShare / fmtThresholdShareExact',
+  );
+  assert.match(fn, /fmtThresholdShare\(/, '分享摘要必须用 fmtThresholdShare（2 位精度）');
+  assert.match(fn, /fmtThresholdShareExact\(/, '分享摘要必须用 fmtThresholdShareExact（4 位"精确"值）');
+  assert.match(fn, /精确/, '分享摘要必须并列给出"精确"值，避免声称某个两位小数能精确命中');
 });
 
 /* ───────────────────────── 措辞与边界 ───────────────────────── */
