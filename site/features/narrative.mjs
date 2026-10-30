@@ -10,6 +10,9 @@
  */
 
 import { pickValidationActions, inferCategory } from '../data/validation-actions.mjs';
+// 同分要分两级：exact 才是"分数完全相同"，display 只是四舍五入后显示相同。
+// 这个文件的 chairLine / sideArgument 也是可见文案，必须共用同一套判据。
+import { tieLevelOf } from '../precision.mjs';
 
 /** @typedef {{id:string,label:string,weight:number,ratings:{A:number,B:number}}} Factor */
 
@@ -307,9 +310,10 @@ export function buildViewpoints(analysis, flip, hypothesis) {
     return emptyViewpoints();
   }
 
-  const { contributions, options, tie, difference } = analysis;
+  const { contributions, options, difference } = analysis;
   const aLabel = options[0]?.label || 'A';
   const bLabel = options[1]?.label || 'B';
+  const tieLevel = tieLevelOf(analysis);
 
   const positives = contributions.filter((c) => c.delta > 1e-9).sort((x, y) => y.delta - x.delta);
   const negatives = contributions.filter((c) => c.delta < -1e-9).sort((x, y) => x.delta - y.delta);
@@ -319,14 +323,14 @@ export function buildViewpoints(analysis, flip, hypothesis) {
     own: positives,
     other: negatives.map(toSideB),
     otherLabel: bLabel,
-    tie,
+    tieLevel,
   });
   const opposeText = sideArgument({
     sideLabel: bLabel,
     own: negatives.map(toSideB),
     other: positives,
     otherLabel: aLabel,
-    tie,
+    tieLevel,
   });
 
   return {
@@ -334,7 +338,7 @@ export function buildViewpoints(analysis, flip, hypothesis) {
     oppose: { role: '支持 B 的一方会说', text: opposeText },
     chair: {
       role: '主持这件事的人会说',
-      text: chairLine({ flip, hypothesis, tie, difference, contributions, aLabel, bLabel }),
+      text: chairLine({ flip, hypothesis, tieLevel, difference, contributions, aLabel, bLabel }),
     },
     disclaimer: '以上三句是规则模板生成的思考角度，不代表律师、心理咨询师或任何专业人士的意见，也不构成建议。',
   };
@@ -367,10 +371,13 @@ function toSideB(c) {
 /**
  * 一边的论据。关键边界：这一边如果一项占优都没有，就不能硬说"这几项偏向我"。
  */
-function sideArgument({ sideLabel, own, other, otherLabel, tie }) {
+function sideArgument({ sideLabel, own, other, otherLabel, tieLevel }) {
   if (own.length === 0) {
-    if (tie) {
+    if (tieLevel === 'exact') {
       return `说句公道话：「${sideLabel}」这边一项都没占上风——所有因素两边分数都一样，现在没有任何一条能拿出来说的理由。`;
+    }
+    if (tieLevel === 'display') {
+      return `说句公道话：「${sideLabel}」这边一项都没占上风——两边分数四舍五入到 1 位小数后是一样的（原始计算仍有细微差异），所以这一边现在没有任何一条能拿出来说的理由。`;
     }
     return `说句公道话：「${sideLabel}」在所有因素上都没有拿到比对方更高的分，这一边现在一条站得住的理由都没有。真要支持它，得从你还没写进这张表的因素里找。`;
   }
@@ -394,7 +401,7 @@ function sideArgument({ sideLabel, own, other, otherLabel, tie }) {
 /**
  * 主持者那句话：必须给出具体的下一步动作，而不是"再想想"。
  */
-function chairLine({ flip, hypothesis, tie, difference, contributions, aLabel, bLabel }) {
+function chairLine({ flip, hypothesis, tieLevel, difference, contributions, aLabel, bLabel }) {
   const hypLabel = hypothesis && hypothesis.label ? hypothesis.label : null;
   // 不从 hypothesis.steps[0] 里复制整句：那句是通用模板，遇到"搬家要搬的东西"这类
   // 客观属性因素会读成"找人问一句「搬家要搬的东西」"，语义不通。
@@ -420,6 +427,11 @@ function chairLine({ flip, hypothesis, tie, difference, contributions, aLabel, b
     const verb = flip.direction === 'increase' ? '提高' : '降低';
     const beyond = flip.direction === 'increase' ? '再往上' : '再往下';
     const gap = Math.abs(flip.thresholdShare - flip.currentShare);
+    // display 级同分时，屏幕上已经是同一个数了；直接说"提高到 X 就会打平"
+    // 会让人以为现在还没打平。补一句：现在只是显示同分，下面说的是**精确**打平点。
+    const displayNote = tieLevel === 'display'
+      ? `（注意：你现在看到的两边是四舍五入后同一个数，原始计算还差 ${fmt(Math.abs(difference))} 分；下面讲的是精确打平的位置。）`
+      : '';
 
     // 现在完全没参与计算的因素，单独说：它一旦被算进来就可能翻盘。
     // 阈值保留 2 位小数：1 位小数的临界值（如 39.4%）在数值上并不真的打平，
@@ -441,23 +453,33 @@ function chairLine({ flip, hypothesis, tie, difference, contributions, aLabel, b
     }
     // 措辞改为"约 X（精确 Y）"：临界点一般是无理数级的数，任何有限位的小数都只能"约等于"。
     // 说成"降低到 39.4，两边就会打平"是错的——39.4% 处实测仍有 Δ=−0.004。
-    return `先别急着定。把「${flip.label}」的权重占比从现在的 ${pct(flip.currentShare)} ${verb}到约 ${pct(flip.thresholdShare, 2)}（精确 ${pct(flip.thresholdShare, 4)}），两边就会打平，${beyond}就翻过来——${remark}${nextStepText}`;
+    return `先别急着定。${displayNote}把「${flip.label}」的权重占比从现在的 ${pct(flip.currentShare)} ${verb}到约 ${pct(flip.thresholdShare, 2)}（精确 ${pct(flip.thresholdShare, 4)}），两边就会打平，${beyond}就翻过来——${remark}${nextStepText}`;
   }
 
   // ③ 没有可行阈值，而且两边完全打平（此时每个因素要么同分、要么互相抵消到没有杠杆）
-  if (tie) {
+  if (tieLevel !== 'none') {
     const total = (contributions || []).length;
     const flat = (contributions || []).filter((c) => Math.abs(c.delta) < 1e-9).length;
     const allFlat = total > 0 && flat === total;
     const ask = hypLabel
       ? `先回答「${hypLabel}」这一个问题：你凭什么觉得两边一样？`
       : '先挑一个你最有把握的因素，把两边的分重新打一次。';
+    // display 级不能说"完全打平"，也不能说"调权重不会有任何变化" ——
+    // 原始值其实差一点点，只是四舍五入后看不出来。
+    if (tieLevel === 'display') {
+      return `两边显示为相同分数（四舍五入到 1 位小数），原始计算只差 ${fmt(Math.abs(difference))} 分。这个差距小到单个因素的权重怎么调都翻不过来——真正要做的是先把评分打出差别：${ask}`;
+    }
     return `两边现在完全打平${allFlat ? '，而且每个因素的评分都一样' : ''}。这种局面下调权重不会有任何变化，因为没有任何一项在往里加分。真正要做的是先把评分打出差别——${ask}`;
   }
 
   // ④ 没有可行阈值，但确实分出胜负：各因素方向一致，翻不过来
   const leadLabel = difference > 0 ? `「${aLabel}」` : `「${bLabel}」`;
   const gapText = fmt(Math.abs(difference));
+  // display 级同分走到这里（没有可行阈值）：屏幕上两边是同一个数，
+  // 就绝不能说"领先的 0.1 分" —— 那是用户看不到、也验证不了的数字。
+  if (tieLevel === 'display') {
+    return `在只调一个因素权重的前提下，这个结论翻不过来：两边显示为相同分数（四舍五入到 1 位小数），原始计算只差 ${gapText} 分，而这个差距小到调权重抹不掉、也小到看不出来。别再和权重较劲了，能改变结论的只有评分本身——把真实差距打出来，结论才有意义。${nextStepText}`;
+  }
   return `在只调一个因素权重的前提下，这个结论翻不过来：你给两个方案的评分在每个因素上方向都一致，领先的 ${gapText} 分不是靠某一项撑起来的，挪权重抹不掉它（${leadLabel}这一边）。别再和权重较劲了，能改变结论的只有评分本身。${nextStepText}`;
 }
 

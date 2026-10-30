@@ -3038,6 +3038,10 @@ main:focus:not(:focus-visible) {
 .hero-demo-jump {
   margin-top: .5rem;
   padding: .35rem .7rem;
+  /* 触控目标：实测 320~1440 全部断点下这颗按钮只有 33.8px 高，
+     是演示卡里唯一低于 44px 的可点元素（其它控件都已用 var(--tap)）。
+     补到 --tap 后卡片整体高 10px，首屏可见性/CLS 实测无回归。 */
+  min-height: var(--tap);
   font: inherit;
   font-size: .78rem;
   font-weight: 700;
@@ -3129,4 +3133,58 @@ main:focus:not(:focus-visible) {
     outline-color: Highlight;
   }
 }
+
+/* --------------------------------------------------------------------------
+   移动端首屏：演示卡进不了首屏（v10 实测修复）
+   --------------------------------------------------------------------------
+   实测（真实视口，scrollY=0，Playwright + PerformanceObserver('layout-shift')）：
+     320×568  #hero-demo top=594.4 可见 0px   ← 完全看不到
+     360×640  top=594.8 可见 45px   ← 只露出卡片上边框
+     390×844  top=606.1 可见 238px
+     430×932  top=608.7 可见 323px（判定行 941 仍在折线外）
+
+   原因不是演示卡太高，而是它上面的留白在窄屏上按桌面比例铺开：
+   hero 顶部 25.6px、eyebrow 下 17.6px、lede 上 18.4px、
+   CTA 上下 29.6/25.6px、边界说明上 21.6+14.4px、两栏 row-gap 28px。
+   这一串加起来 150px 左右，把卡片顶到 594px —— 比 568px 的视口还高 26px。
+
+   修法：只在 ≤559px 把这一串留白收紧一档（手机端节奏本来就该更紧），
+   短屏（≤820px 高）再收一档。**不动字号/行高**（可读性优先）、
+   **不动文案**（边界声明一个字都不删，summary 文案原样保留）、
+   **不动触控目标**（CTA 56/44、summary 44、滑杆 44 全部保持原高）。
+   纯 CSS，无 JS 变更，也不改任何颜色。
+
+   实测收益（同条件复测，CLS 均为 0.000）：
+     320  top 594.4 → 518.6  可见 49px（露出「真实示例 · 可拖动」+ LIVE 徽章）
+     360  top 594.8 → 519.1  可见 121px（卡片标题 + 两个分数）
+     390  top 606.1 → 534.9  可见 309px（到权重滑杆）
+     430  top 608.7 → 537.5  可见 395px（整卡 + 判定行都进首屏）
+   横向溢出四档均为 0，触控目标尺寸一位没变。
+   -------------------------------------------------------------------------- */
+@media (max-width: 559px) {
+  /* 品牌带顶部留白：20px（原 25.6~36px；固定页头 63px 未动） */
+  .hero { padding-block-start: clamp(1.25rem, 3vw, 1.75rem); }
+  /* 元信息行 → 标题 */
+  .hero .eyebrow { margin-bottom: .75rem; }
+  /* 标题 → 正文 */
+  .hero .lede { margin-top: .85rem; }
+  /* CTA 组上下与两个按钮之间（按钮自身 56px / 44px 不变） */
+  .hero-actions { margin-block: 1.2rem 1rem; gap: .65rem; }
+  /* 边界说明：只收外边距与上内边距，summary 仍保持 44px 触控高度 */
+  .hero-boundary { margin-top: .85rem; padding-top: .65rem; }
+  /* 文案栏与演示卡之间（单列时就是两者的竖向间距） */
+  .hero-grid { row-gap: 1.15rem; }
+}
+
+/* 短屏（≤820px 高）再收一档：
+   320×568 上光是 44px 的边界 summary 就占掉 8% 屏高，不额外收这一档，
+   卡片上沿仍会卡在折线下方（按方案 A 实测 552 只露出 16px 一条边）。 */
+@media (max-height: 820px) and (max-width: 420px) {
+  .hero { padding-block-start: 1rem; }
+  .hero .eyebrow { margin-bottom: .65rem; }
+  .hero-actions { margin-block: 1.05rem .9rem; gap: .6rem; }
+  .hero-boundary { margin-top: .75rem; padding-top: .6rem; }
+  .hero-grid { row-gap: 1rem; }
+}
+
 

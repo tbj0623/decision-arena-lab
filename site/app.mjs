@@ -18,7 +18,13 @@ import {
   projectAtShare,
   diagnoseNoFlip,
   ValidationError,
+  TIE_EPSILON,
 } from './core.mjs';
+
+import {
+  fmt1, tieLevelOf, shownGapOf, signedShownGap,
+  fmtThresholdShare, fmtThresholdShareExact,
+} from './precision.mjs';
 
 import { EXAMPLES, cloneBody, buildViewpoints, detectHighRisk, highRiskNotice } from './features/narrative.mjs';
 
@@ -48,10 +54,6 @@ function clear(node) {
 
 function $(sel, root = document) {
   return root.querySelector(sel);
-}
-
-function fmt1(n) {
-  return (Math.round(n * 10) / 10).toFixed(1);
 }
 
 /**
@@ -668,9 +670,12 @@ function renderScores(analysis) {
     { side: 'B', label: analysis.options[1].label, score: analysis.scoreB },
   ];
 
+  // 读屏也要遵守同分两级规则：display 级时可见区说"打平"，
+  // 这一行就不能还播"当前更倾向这一项" —— 否则视障用户听到的和屏幕显示相反。
+  const winnerTieLevel = tieLevelOf(analysis);
   for (const row of rows) {
     const width = Math.max(0, Math.min(100, row.score));
-    const isWinner = analysis.winner === row.side;
+    const isWinner = winnerTieLevel === 'none' && analysis.winner === row.side;
     box.append(el('div', { class: 'score-row', dataset: { side: row.side } },
       el('div', { class: 'score-row-head' },
         el('span', { class: 'score-name', text: row.label }),
@@ -693,25 +698,33 @@ function renderScores(analysis) {
 
   // 打平判据全站统一成一条规则：**屏幕说打平 ⇔ 屏幕上两个数字一样**。
   //
+  // 但"打平"本身分两级精度，措辞必须分开（V10 P1-1，见 tieLevelOf）：
+  //   exact   —— 核心 |Δ| < 1e-9，可以说「分数完全相同」
+  //   display —— 只是四舍五入后显示相同，必须补「原始计算存在细微差异」
+  //   none    —— 正常比大小
+  //
   // 历史缺陷（定位复核）：结果卡用 core 的 `analysis.tie`（1e-9 精确判据），
   // 翻转卡用"两个显示分数相等"。两套判据在 Δ=1e-9~0.05 之间会打架：
   //   rent/laptop/longdist 点完「跳到精确临界点」后
   //   翻转卡「就在临界点上…两边打平（差 0.0）」
   //   结果卡「更倾向「市区的小两居」」+「领先 0.0 分」
   // 9 个内置示例里 3 个稳定复现。现在两边都用显示值。
-  const tieShown = fmt1(analysis.scoreA) === fmt1(analysis.scoreB);
+  const tieLevel = tieLevelOf(analysis);
 
   if (verdict) {
-    if (tieShown) verdict.textContent = `按你现在的打分，两边打平。`;
+    if (tieLevel === 'exact') verdict.textContent = '按你现在的打分，两边分数完全相同。';
+    else if (tieLevel === 'display') verdict.textContent = '按你现在的打分，两边打平（显示精度）。';
     else verdict.textContent = `按你现在的打分，更倾向「${analysis.winner === 'A' ? a : b}」。`;
   }
 
   if (sub) {
-    if (tieShown) {
-      sub.textContent = '两边显示分数相同。任何一点权重或评分的改动都可能让结果偏向一边。';
+    if (tieLevel === 'exact') {
+      sub.textContent = '两边分数完全相同。任何一点权重或评分的改动都可能让结果偏向一边。';
+    } else if (tieLevel === 'display') {
+      sub.textContent = '两边显示为相同分数（四舍五入到 1 位小数），原始计算存在细微差异——任何一点权重或评分的改动都可能让结果偏向一边。';
     } else {
       // 差值也必须和两个显示分数同源（跨浏览器审计 F2）
-      const gapText = Math.abs(Number(fmt1(analysis.scoreA)) - Number(fmt1(analysis.scoreB))).toFixed(1);
+      const gapText = shownGapOf(analysis);
       const tone = analysis.closeness === 'very-close' ? '这个差距非常接近，稍微改一下权重就可能翻过来。'
         : analysis.closeness === 'close' ? '这个差距不算大，结论并不牢靠。'
         : analysis.closeness === 'clear' ? '差距比较明显，但还不是决定性的。'
@@ -727,7 +740,9 @@ function updateClosenessPill(analysis) {
   pill.hidden = false;
   let text = '差距很大';
   let tone = 'ok';
-  if (fmt1(analysis.scoreA) === fmt1(analysis.scoreB)) { text = '打平'; tone = 'neutral'; }
+  const tieLevel = tieLevelOf(analysis);
+  if (tieLevel === 'exact') { text = '打平'; tone = 'neutral'; }
+  else if (tieLevel === 'display') { text = '显示打平'; tone = 'neutral'; }
   else if (analysis.closeness === 'very-close') { text = '几乎打平'; tone = 'warn'; }
   else if (analysis.closeness === 'close') { text = '很接近'; tone = 'warn'; }
   else if (analysis.closeness === 'clear') { text = '比较明确'; tone = 'neutral'; }
@@ -744,7 +759,10 @@ function renderContribTable(analysis) {
 
   // 贡献值按"加总后必须等于显示差值"的规则取整，避免用户看到 7.2 vs 7.1 而以为算错
   const rawDeltas = analysis.contributions.map((c) => c.delta);
-  const shownDeltas = round1SummingTo(rawDeltas, analysis.difference);
+  // 取整目标必须是**用户看到的那个差值**（两个显示分数相减），而不是原始 difference。
+  // 否则"显示同分"时合计行会写成 66.1 | 66.1 | +0.1，屏幕自己跟自己打架。
+  const shownDiffValue = signedShownGap(analysis);
+  const shownDeltas = round1SummingTo(rawDeltas, shownDiffValue);
   // 得分点数的列也必须满足"逐项相加 = 合计"，否则用户一验算就发现对不上
   const shownPointsA = round1SummingTo(analysis.contributions.map((c) => c.pointsA), analysis.scoreA);
   const shownPointsB = round1SummingTo(analysis.contributions.map((c) => c.pointsB), analysis.scoreB);
@@ -791,7 +809,7 @@ function renderContribTable(analysis) {
       el('td', { text: '100.0%' }),
       el('td', { text: fmt1(analysis.scoreA) }),
       el('td', { text: fmt1(analysis.scoreB) }),
-      el('td', { text: analysis.tie ? '0.0' : `${analysis.difference > 0 ? '+' : ''}${fmt1(analysis.difference)}` })));
+      el('td', { text: shownDiffValue === 0 ? '0.0' : `${shownDiffValue > 0 ? '+' : ''}${fmt1(shownDiffValue)}` })));
   }
 }
 
@@ -821,13 +839,28 @@ function renderFlip(analysis, thresholds, flip) {
   // 同一屏上还能看到"领先 0.0 分"和"翻不过来"，两句话互相矛盾。
   //
   // 打平必须单独说：现在两边一样，往任一方向调都会立刻分出胜负。
-  if (analysis.tie) {
-    box.append(el('p', { class: 'flip-headline', text: '现在两边分数完全相同——这是最容易翻过去的状态。' }));
+  const tieLevel = tieLevelOf(analysis);
+  if (tieLevel !== 'none') {
+    box.append(el('p', {
+      class: 'flip-headline',
+      text: tieLevel === 'exact'
+        ? '现在两边分数完全相同——这是最容易翻过去的状态。'
+        : '现在两边显示为相同分数（四舍五入到 1 位小数），原始计算存在细微差异——这同样是最容易被翻过去的状态。',
+    }));
+    // "没有杠杆"的真正判据是**每个因素的 delta 都是 0**，
+    // 不能因为 anyFeasible=false 就断言"评分完全一样"。
+    // 反例（V10 复核，界面允许的 0.5 步进即可复现）：
+    //   权重 0.5/10/10/10，评分 A 5,5,5,5.5 对 B 4.5,5,5,5.5
+    //   → 分数 51.64 / 51.56，显示同分 51.6/51.6，四个阈值全是 BOUNDARY。
+    //   f1 是 5 对 4.5，旧文案却硬说"评分完全一样"。
+    const allGapsZero = (analysis.contributions || []).every((c) => Math.abs(c.delta) < TIE_EPSILON);
     box.append(el('p', {
       class: 'result-empty',
       text: anyFeasible
         ? '任何一点权重变化都会立刻让某一边领先。所以此刻真正该问的不是"怎么调权重"，而是"我对哪一项最没把握"——去核实那一项。'
-        : '你给两个方案在每个因素上的评分完全一样，所以调权重不会有任何变化（没有哪一项在往里加分）。真正要做的是先把评分打出差别——去核实事实，而不是纠结权重。',
+        : allGapsZero
+          ? '你给两个方案在每个因素上的评分完全一样，所以调权重不会有任何变化（没有哪一项在往里加分）。真正要做的是先把评分打出差别——去核实事实，而不是纠结权重。'
+          : '两边只差不到显示精度的距离（四舍五入后是同一个数），但每个因素的差距方向一致，所以调单个因素的权重也翻不过来。想改变结论，只能把某一项的评分打出真实差距——去核实事实，别再纠结权重。',
     }));
     box.append(buildThresholdList(thresholds));
 
@@ -849,7 +882,7 @@ function renderFlip(analysis, thresholds, flip) {
     return;
   }
 
-  if (!anyFeasible && !analysis.tie) {
+  if (!anyFeasible && tieLevel === 'none') {
     box.append(el('p', { class: 'flip-headline', text: '在只调整单个因素权重的情况下，结论翻不过来。' }));
 
     // 说清**为什么**翻不过来 —— 不是所有"翻不过来"都是同一个原因。
@@ -941,15 +974,21 @@ function flipDescription(flip, analysis) {
   // 两真一假，而假的那句还带着一长串"前提"限定语，
   // 看起来反而比真话更权威——这种误导比留白更糟。
   if (!flip) {
-    if (analysis && analysis.tie) {
-      return `现在两边分数完全相同，而且你给每个因素的评分也一样，所以调整权重不会改变任何东西——没有哪一项在往里加分。想真正改变结论，需要先去核实事实、把评分打出差别，而不是继续调权重。${scope}`;
+    const tieLevel = analysis ? tieLevelOf(analysis) : 'none';
+    if (tieLevel !== 'none') {
+      const sameText = tieLevel === 'exact'
+        ? '现在两边分数完全相同'
+        : '现在两边显示为相同分数（四舍五入到 1 位小数，原始计算存在细微差异）';
+      return `${sameText}，而且你给每个因素的评分也一样，所以调整权重不会改变任何东西——没有哪一项在往里加分。想真正改变结论，需要先去核实事实、把评分打出差别，而不是继续调权重。${scope}`;
     }
     return `在你目前打的这些分数下，无论怎么调整单个因素的权重，结论都翻不过来。${scope}`;
   }
 
   const cur = pct(flip.currentShare, 1);
-  const thr = pct(flip.thresholdShare, 2);
-  const holdPrecise = pct(flip.thresholdShare, 4);
+  // 阈值精度统一走 precision.mjs 的格式化函数（2 位 + 4 位精确），
+  // 不再各处手写 pct(..., 2)：历史上就漏过分享摘要那一处，造成"39.4% 会打平"的假承诺。
+  const thr = fmtThresholdShare(flip.thresholdShare);
+  const holdPrecise = fmtThresholdShareExact(flip.thresholdShare);
 
   if (flip.direction === 'hold') {
     return `「${flip.label}」现在的权重占比 ${cur} 恰好就在打平点附近。此刻两边分数相同——往任一方向拨动都会立刻偏向一方。${scope}`;
@@ -982,7 +1021,7 @@ function buildThresholdList(thresholds) {
       // 历史缺陷（growth-producer W02-01 发现）：标题行显示「39.39%（精确 39.3939%）」，
       // 这张列表却显示「39.4%」——同一页面两种精度，用户会以为是两个不同的数，
       // 对外素材逐字引用界面时也会因此写错。
-      numText = t.direction === 'hold' ? '已打平' : pct(t.thresholdShare, 2);
+      numText = t.direction === 'hold' ? '已打平' : fmtThresholdShare(t.thresholdShare);
     }
     const item = el('li', { class: 'flip-item', dataset: { state: feasible ? 'feasible' : 'infeasible' } },
       name,
@@ -1002,7 +1041,7 @@ function buildFlipSlider(flip) {
   /** 把给定占比画到界面上：同时更新 output、滑杆拇指位置、实时文案。 */
   const describe = (t, { moveSlider = true } = {}) => {
     const projected = projectAtShare(state, flip.factorId, t);
-    out.value = pct(t, 2);
+    out.value = fmtThresholdShare(t);
     // 关键：滑杆位置必须跟着走，否则界面会同时存在两个矛盾的位置指示（red-team P0-5）
     if (moveSlider) slider.value = String(t * 100);
 
@@ -1014,7 +1053,7 @@ function buildFlipSlider(flip) {
     // 但 aria-valuetext 仍是初始的「28.57%」，aria-label 里也写着"当前 28.57%"。
     // 读屏用户听到的永远是那一开始的值 —— 而视觉用户看到的完全正确。
     // 这类缺陷只有真正用读屏/查 AX tree 才会发现；首屏那根滑杆是对的，只有工作区这根漏了。
-    const pctText = pct(t, 2);
+    const pctText = fmtThresholdShare(t);
     slider.setAttribute('aria-valuetext', pctText);
     // aria-label 里嵌了当前值，也必须同步，否则读屏会念出两个不同的数
     slider.setAttribute('aria-label', `「${flip.label}」的权重占比（0–100%，当前 ${pctText}）`);
@@ -1033,14 +1072,19 @@ function buildFlipSlider(flip) {
     // 显示成 0.0 就必须说打平；显示成 0.1 就不许说打平。
     // 同源修复（见首屏那段注释）：判据必须和"两个显示出来的分数"一致，
     // 否则会出现「A 66.0 / B 66.1，两边打平（差 0.0）」这种自相矛盾的句子。
-    const isTie = fmt1(projected.scoreA) === fmt1(projected.scoreB);
-    if (isTie) verdictText = '两边打平';
+    const isDisplayTie = fmt1(projected.scoreA) === fmt1(projected.scoreB);
+    const isExactTie = Math.abs(projected.difference) < TIE_EPSILON;
+    if (isDisplayTie) verdictText = isExactTie ? '两边打平（完全相等）' : '两边显示打平';
     else if (projected.difference > 0) verdictText = analysisLabel('A');
     else verdictText = analysisLabel('B');
-    const near = isTie ? '（就在临界点上）' : '';
+    // 只有**精确**同分才等价于"正好落在临界点"：Δ(t) 是线性的、零点唯一，
+    // display 级（Δ 可达 0.05）离 t* 仍有距离，说"就在临界点上"是失实。
+    // 反例（V10 复核）：屏幕显示 59.8/59.8 时占比 32.79%，
+    // 同一张卡的标题却写临界点在 33.87% —— 自己打自己脸。
+    const near = isExactTie ? '（就在临界点上）' : '';
     clear(live);
     live.append(
-      el('span', { text: `权重占比 ${pct(t, 2)}${near}：` }),
+      el('span', { text: `权重占比 ${fmtThresholdShare(t)}${near}：` }),
       el('strong', { text: `A ${fmt1(projected.scoreA)} / B ${fmt1(projected.scoreB)}` }),
       // 同源修复（见首屏注释）：差值用两个**显示出来的**分数相减
     el('span', { text: `，${verdictText}（差 ${Math.abs(Number(fmt1(projected.scoreA)) - Number(fmt1(projected.scoreB))).toFixed(1)}）` }));
@@ -1111,7 +1155,7 @@ function buildFlipSlider(flip) {
     ),
     el('label', { for: sliderId },
       el('span', {}, '亲手拨一下：把「', el('strong', { text: flip.label }), '」的权重占比拖到 ',
-        pct(flip.thresholdShare, 2), ' 附近看看')),
+        fmtThresholdShare(flip.thresholdShare), ' 附近看看')),
     // <output> 在 <label> 之外：它是当前值的显示，不是控件名字的一部分
     out,
     slider,
@@ -1164,19 +1208,28 @@ function buildFlipSlider(flip) {
       const appliedWeight = state.factors.find((f) => f.id === flip.factorId)?.weight;
       const totalW = state.factors.reduce((acc, f) => acc + f.weight, 0);
       const actualShare = totalW > 0 && appliedWeight != null ? appliedWeight / totalW : null;
-      const tieNow = actual
-        ? fmt1(actual.scoreA) === fmt1(actual.scoreB)
-        : Math.abs(projected?.difference ?? 1) < 1e-9;
+      const tieLevel = tieLevelOf(actual);
       const truncated = actualShare != null && Math.abs(actualShare - targetShare) > 0.0005;
 
       let msg;
-      if (tieNow) {
-        msg = `已把「${flip.label}」的权重真的改成 ${appliedWeight}（占比 ${pct(actualShare ?? targetShare, 4)}）。上方结果、左侧权重滑杆、导出数据都已同步——两边分数相同。`;
-      } else if (truncated) {
-        const need = (targetShare * (totalW - (appliedWeight ?? 0))) / (1 - targetShare);
-        msg = `调不到。要打平需要「${flip.label}」的权重约 ${need.toFixed(1)}，但权重滑杆上限是 ${MAX_WEIGHT_UI}。` +
-          `现在只能给到 ${appliedWeight}（占比 ${pct(actualShare, 2)}），两边仍差 ${fmt1(Math.abs(actual.difference))} 分。` +
-          `——这条结论只能靠调整评分来验证，不是调权重能解决的。`;
+      // 顺序很重要：**先检查是否被输入上限截断**，再谈同分。
+      //
+      // 历史缺陷（V10 复核，界面可复现）：案例 X 点「跳到精确临界点」时
+      // 需要权重 10.5，而滑杆上限是 10，实际只能给到 10。旧代码把 display
+      // 同分分支放在 truncated 前面，于是提示说
+      //   「已把权重真的改成 10……两边显示为相同分数」
+      // ——完全没交代"根本没到临界点"，属于典型的假成功。
+      const need = truncated ? (targetShare * (totalW - (appliedWeight ?? 0))) / (1 - targetShare) : null;
+      if (truncated) {
+        const nowText = tieLevel === 'display'
+          ? `现在只能给到 ${appliedWeight}（占比 ${pct(actualShare, 2)}）——两边显示为相同分数（四舍五入到 1 位小数），但原始计算仍差 ${fmt1(Math.abs(actual?.difference ?? 0))} 分，并没有精确打平。`
+          : `现在只能给到 ${appliedWeight}（占比 ${pct(actualShare, 2)}），两边仍差 ${fmt1(Math.abs(actual?.difference ?? 0))} 分。`;
+        msg = `调不到精确打平。需要「${flip.label}」的权重约 ${need.toFixed(1)}，但权重滑杆上限是 ${MAX_WEIGHT_UI}。${nowText}` +
+          '——这条结论只能靠调整评分来验证，不是调权重能解决的。';
+      } else if (tieLevel === 'exact') {
+        msg = `已把「${flip.label}」的权重真的改成 ${appliedWeight}（占比 ${pct(actualShare ?? targetShare, 4)}）。上方结果、左侧权重滑杆、导出数据都已同步——两边分数完全相同。`;
+      } else if (tieLevel === 'display') {
+        msg = `已把「${flip.label}」的权重真的改成 ${appliedWeight}（占比 ${pct(actualShare ?? targetShare, 4)}）。上方结果、左侧权重滑杆、导出数据都已同步——两边显示为相同分数（四舍五入到 1 位小数），原始计算存在细微差异。`;
       } else if (actual) {
         msg = `已把「${flip.label}」的权重改成 ${appliedWeight}（占比 ${pct(actualShare, 2)}），但两边仍差 ${fmt1(Math.abs(actual.difference))} 分，未达到打平。`;
       } else {
@@ -1335,7 +1388,14 @@ function buildShareText() {
   lines.push('我用「反悔雷达」算了一个纠结中的选择。');
   lines.push('');
   lines.push('两个方案我分别叫 A 和 B（具体是什么就不写在这了）。');
-  lines.push(`结果：A ${fmt1(lastAnalysis.scoreA)} 分 / B ${fmt1(lastAnalysis.scoreB)} 分（差 ${fmt1(Math.abs(lastAnalysis.difference))}）。`);
+  // 差值必须和页面同源（两个显示分数相减），否则分享出去的数与页面对不上。
+  lines.push(`结果：A ${fmt1(lastAnalysis.scoreA)} 分 / B ${fmt1(lastAnalysis.scoreB)} 分（差 ${shownGapOf(lastAnalysis)}）。`);
+  // display 级同分：分享出去的数字是四舍五入后的，必须自带"细微差异"说明。
+  // 否则收件人只看到「差 0.0」，会以为两边精确相等 —— 下面那段阈值句会把
+  // tie 分支的免责句短路掉（那条只在 lastFlip 为空时才出现）。
+  if (tieLevelOf(lastAnalysis) === 'display') {
+    lines.push('（上面两个分数是四舍五入到 1 位小数的显示值，原始计算仍有细微差异。）');
+  }
   lines.push('');
   if (lastFlip) {
     // 精度必须与页面内一致（2 位），否则分享出去的数字说不到做到的事。
@@ -1349,8 +1409,8 @@ function buildShareText() {
     // 只会得出"这工具算错了"，而作者不在场无法澄清。
     //
     // 措辞也学页面内的 flipDescription：说"约 X（精确 Y）"，不声称某个两位小数值能精确命中。
-    const sharePct = pct(lastFlip.thresholdShare, 2);
-    const shareExact = pct(lastFlip.thresholdShare, 4);
+    const sharePct = fmtThresholdShare(lastFlip.thresholdShare);
+    const shareExact = fmtThresholdShareExact(lastFlip.thresholdShare);
     lines.push(`最关键的一条：把「${lastFlip.label}」的权重占比调到约 ${sharePct}（精确 ${shareExact}），两边就会打平，再越过就翻过来。`);
   } else {
     // lastFlip 为 null 有**三种**不同情况，不能一律说"方向一致"。
@@ -1364,8 +1424,16 @@ function buildShareText() {
     let reasonText;
     try {
       const dx = diagnoseNoFlip(state);
-      if (analysis.tie) {
+      // 历史缺陷（V10 P1-1 复核发现）：这里原先写的是 `analysis.tie`，
+      // 而 buildShareText() 作用域里根本没有 `analysis` 这个变量
+      // （模块级只有 lastAnalysis）。ReferenceError 被下面的 catch 吞掉，
+      // 于是**打平时分享摘要反而说"结论翻不过来"**，与页面正相反。
+      // 改成用 lastAnalysis + 两级同分判据，并把 display 级单独说出来。
+      const shareTieLevel = tieLevelOf(lastAnalysis);
+      if (shareTieLevel === 'exact') {
         reasonText = '关键发现：两个方案现在分数完全相同——这是最容易翻过去的状态，往任一方向调都会立刻分出胜负。此刻真正该问的是"我对哪一项最没把握"。';
+      } else if (shareTieLevel === 'display') {
+        reasonText = '关键发现：两个方案现在显示为相同分数（四舍五入到 1 位小数），原始计算存在细微差异——这同样是最容易翻过去的状态。此刻真正该问的是"我对哪一项最没把握"。';
       } else if (dx && dx.reason === 'ZERO_GAP') {
         reasonText = '关键发现：有几个因素上两个方案同分，它们对结果没有区分作用。调权重是白费力气，该做的是先给这些因素打出真实的差别。';
       } else if (dx && dx.reason === 'ALL_SAME_SIGN') {
@@ -1553,10 +1621,13 @@ function initHeroDemo() {
     // 这样"说打平" ⇔ "屏幕上两个数字一样"，永远不可能自相矛盾。
     const shownA = fmt1(projected.scoreA);
     const shownB = fmt1(projected.scoreB);
-    const isTie = shownA === shownB;
+    const isDisplayTie = shownA === shownB;
+    const isExactTie = Math.abs(projected.difference) < TIE_EPSILON;
 
-    if (isTie) {
-      verdict.textContent = '两个方案打平了——这是最容易被撬动的时刻。';
+    if (isDisplayTie) {
+      verdict.textContent = isExactTie
+        ? '两个方案分数完全相同——这是最容易被撬动的时刻。'
+        : '两个方案显示为相同分数（四舍五入），原始计算存在细微差异——这仍是最容易被撬动的时刻。';
       verdict.dataset.state = 'tie';
     } else {
       const leading = projected.difference > 0 ? optA.label : optB.label;

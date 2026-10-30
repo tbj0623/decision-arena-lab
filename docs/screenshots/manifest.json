@@ -1,91 +1,308 @@
 {
-  "generatedAt": "2026-10-29T18:37:15.477Z",
-  "commit": "a690307cf77b9ec1008e94b336aa0116d77c5789",
-  "baseUrl": "http://127.0.0.1:8099/",
-  "note": "真实浏览器（Playwright Chromium）从真实运行页面截取。未使用设计原型或 AI 生成图。",
+  "generatedAt": "2026-10-30T05:19:34.104Z",
+  "commit": "5d3b1d65d25050f1ab9102a696aafe97d342acd1",
+  "baseUrl": "http://127.0.0.1:8788/",
+  "browser": "Chromium 151.0.7922.34",
+  "note": "真实浏览器（Playwright Chromium）从真实运行页面截取；未使用设计原型或 AI 生成图。每张图记录拍摄 commit、视口、DPR、主题、示例输入与页面自检结果。",
   "shots": [
     {
       "file": "docs/screenshots/01-desktop-hero-light.png",
       "name": "desktop-hero-light",
       "viewport": "1440×900",
+      "dpr": 2,
       "theme": "light",
-      "commit": "a690307cf77b9ec1008e94b336aa0116d77c5789"
+      "commit": "5d3b1d65d25050f1ab9102a696aafe97d342acd1",
+      "selfCheck": {
+        "kind": "hero",
+        "heroScores": [
+          "70.7",
+          "63.6"
+        ],
+        "heroScoresValid": true,
+        "verdict": "此刻更倾向「去那家刚起步的小团队」，差 7.1 分。",
+        "liveRegion": "此刻更倾向「去那家刚起步的小团队」，差 7.1 分。"
+      },
+      "ok": true
     },
     {
       "file": "docs/screenshots/02-desktop-hero-dark.png",
       "name": "desktop-hero-dark",
       "viewport": "1440×900",
+      "dpr": 2,
       "theme": "dark",
-      "commit": "a690307cf77b9ec1008e94b336aa0116d77c5789"
+      "commit": "5d3b1d65d25050f1ab9102a696aafe97d342acd1",
+      "selfCheck": {
+        "kind": "hero",
+        "heroScores": [
+          "70.7",
+          "63.6"
+        ],
+        "heroScoresValid": true,
+        "verdict": "此刻更倾向「去那家刚起步的小团队」，差 7.1 分。",
+        "liveRegion": "此刻更倾向「去那家刚起步的小团队」，差 7.1 分。"
+      },
+      "ok": true
     },
     {
       "file": "docs/screenshots/03-desktop-hero-tie.png",
       "name": "desktop-hero-tie",
       "viewport": "1440×900",
+      "dpr": 2,
       "theme": "light",
-      "commit": "a690307cf77b9ec1008e94b336aa0116d77c5789"
+      "commit": "5d3b1d65d25050f1ab9102a696aafe97d342acd1",
+      "heroTie": {
+        "share": "39.4%",
+        "a": "66.1",
+        "b": "66.1",
+        "verdict": "两个方案分数完全相同——这是最容易被撬动的时刻。",
+        "live": "两个方案分数完全相同——这是最容易被撬动的时刻。"
+      },
+      "note": "点「跳到打平点」把权重真的写回临界点 t*，两侧分数数值上完全相同",
+      "selfCheck": {
+        "kind": "hero",
+        "heroScores": [
+          "66.1",
+          "66.1"
+        ],
+        "heroScoresValid": true,
+        "verdict": "两个方案分数完全相同——这是最容易被撬动的时刻。",
+        "liveRegion": "两个方案分数完全相同——这是最容易被撬动的时刻。"
+      },
+      "ok": true
     },
     {
       "file": "docs/screenshots/04-desktop-result-flip.png",
       "name": "desktop-result-flip",
       "viewport": "1440×900",
+      "dpr": 2,
       "theme": "light",
+      "commit": "5d3b1d65d25050f1ab9102a696aafe97d342acd1",
       "scrollTo": "#result-card",
-      "commit": "a690307cf77b9ec1008e94b336aa0116d77c5789",
+      "example": "offer",
+      "inputs": {
+        "title": "接不接这家小团队的 offer",
+        "options": [
+          "去那家刚起步的小团队",
+          "留在现在的岗位"
+        ],
+        "factors": [
+          {
+            "label": "成长速度",
+            "weight": 5,
+            "A": 9,
+            "B": 5
+          },
+          {
+            "label": "收入确定性",
+            "weight": 4,
+            "A": 4,
+            "B": 8
+          },
+          {
+            "label": "通勤与作息",
+            "weight": 2,
+            "A": 7,
+            "B": 7
+          },
+          {
+            "label": "团队与直属上级",
+            "weight": 3,
+            "A": 8,
+            "B": 6
+          }
+        ]
+      },
+      "verdict": "按你现在的打分，更倾向「去那家刚起步的小团队」。",
       "selfCheck": {
+        "kind": "result",
         "resultVisible": true,
         "hasScores": true,
         "scores": [
           "70.7",
           "63.6"
         ]
-      }
+      },
+      "ok": true
     },
     {
       "file": "docs/screenshots/05-desktop-workspace.png",
       "name": "desktop-workspace",
       "viewport": "1440×1200",
+      "dpr": 2,
       "theme": "light",
+      "commit": "5d3b1d65d25050f1ab9102a696aafe97d342acd1",
       "scrollTo": "#workspace",
-      "commit": "a690307cf77b9ec1008e94b336aa0116d77c5789",
+      "example": "offer",
+      "inputs": {
+        "title": "接不接这家小团队的 offer",
+        "options": [
+          "去那家刚起步的小团队",
+          "留在现在的岗位"
+        ],
+        "factors": [
+          {
+            "label": "成长速度",
+            "weight": 5,
+            "A": 9,
+            "B": 5
+          },
+          {
+            "label": "收入确定性",
+            "weight": 4,
+            "A": 4,
+            "B": 8
+          },
+          {
+            "label": "通勤与作息",
+            "weight": 2,
+            "A": 7,
+            "B": 7
+          },
+          {
+            "label": "团队与直属上级",
+            "weight": 3,
+            "A": 8,
+            "B": 6
+          }
+        ]
+      },
       "selfCheck": {
+        "kind": "result",
         "resultVisible": true,
         "hasScores": true,
         "scores": [
           "70.7",
           "63.6"
         ]
-      }
+      },
+      "ok": true
     },
     {
       "file": "docs/screenshots/06-mobile-hero-375.png",
       "name": "mobile-hero-375",
       "viewport": "375×812",
+      "dpr": 2,
       "theme": "light",
-      "commit": "a690307cf77b9ec1008e94b336aa0116d77c5789"
+      "commit": "5d3b1d65d25050f1ab9102a696aafe97d342acd1",
+      "demoAboveFold": {
+        "top": 519,
+        "visiblePx": 293,
+        "viewportH": 812
+      },
+      "selfCheck": {
+        "kind": "hero",
+        "heroScores": [
+          "70.7",
+          "63.6"
+        ],
+        "heroScoresValid": true,
+        "verdict": "此刻更倾向「去那家刚起步的小团队」，差 7.1 分。",
+        "liveRegion": "此刻更倾向「去那家刚起步的小团队」，差 7.1 分。"
+      },
+      "ok": true
     },
     {
       "file": "docs/screenshots/07-mobile-hero-390.png",
       "name": "mobile-hero-390",
       "viewport": "390×844",
+      "dpr": 2,
       "theme": "light",
-      "commit": "a690307cf77b9ec1008e94b336aa0116d77c5789"
+      "commit": "5d3b1d65d25050f1ab9102a696aafe97d342acd1",
+      "demoAboveFold": {
+        "top": 535,
+        "visiblePx": 309,
+        "viewportH": 844
+      },
+      "selfCheck": {
+        "kind": "hero",
+        "heroScores": [
+          "70.7",
+          "63.6"
+        ],
+        "heroScoresValid": true,
+        "verdict": "此刻更倾向「去那家刚起步的小团队」，差 7.1 分。",
+        "liveRegion": "此刻更倾向「去那家刚起步的小团队」，差 7.1 分。"
+      },
+      "ok": true
     },
     {
       "file": "docs/screenshots/08-mobile-result.png",
       "name": "mobile-result",
       "viewport": "390×844",
+      "dpr": 2,
       "theme": "light",
+      "commit": "5d3b1d65d25050f1ab9102a696aafe97d342acd1",
       "scrollTo": "#result-card",
-      "commit": "a690307cf77b9ec1008e94b336aa0116d77c5789",
+      "example": "offer",
+      "inputs": {
+        "title": "接不接这家小团队的 offer",
+        "options": [
+          "去那家刚起步的小团队",
+          "留在现在的岗位"
+        ],
+        "factors": [
+          {
+            "label": "成长速度",
+            "weight": 5,
+            "A": 9,
+            "B": 5
+          },
+          {
+            "label": "收入确定性",
+            "weight": 4,
+            "A": 4,
+            "B": 8
+          },
+          {
+            "label": "通勤与作息",
+            "weight": 2,
+            "A": 7,
+            "B": 7
+          },
+          {
+            "label": "团队与直属上级",
+            "weight": 3,
+            "A": 8,
+            "B": 6
+          }
+        ]
+      },
       "selfCheck": {
+        "kind": "result",
         "resultVisible": true,
         "hasScores": true,
         "scores": [
           "70.7",
           "63.6"
         ]
-      }
+      },
+      "ok": true
+    },
+    {
+      "file": "docs/screenshots/09-nine-examples.png",
+      "name": "nine-examples",
+      "viewport": "1440×1400",
+      "dpr": 2,
+      "theme": "light",
+      "commit": "5d3b1d65d25050f1ab9102a696aafe97d342acd1",
+      "clipTo": "#example-grid",
+      "exampleKeys": [
+        "offer",
+        "laptop",
+        "rent",
+        "study",
+        "oldguitar",
+        "city",
+        "car",
+        "longdist",
+        "pet"
+      ],
+      "selfCheck": {
+        "kind": "examples",
+        "exampleCount": 9,
+        "allNineRendered": true
+      },
+      "ok": true
     }
   ]
 }
