@@ -363,3 +363,25 @@ test('M19 app.mjs 三处越界已收口（临界点提示/读屏 winner/翻转�
   // ④ 分享摘要的 display 免责句必须独立存在（不被 lastFlip 分支短路）
   assert.match(code, /tieLevelOf\(lastAnalysis\) === 'display'/, '分享摘要缺少 display 级免责句');
 });
+
+/* ───────── M20：tippingPoint 被输入上限截断时必须先报"到不了" ───────── */
+
+test('M20 跳到临界点被上限截断：先报「调不到」再谈同分，且差值用原始值', async () => {
+  const code = stripComments(await readFile(APP, 'utf8'));
+  const iTrunc = code.indexOf('if (truncated) {');
+  const iExact = code.indexOf("} else if (tieLevel === 'exact') {");
+  assert.ok(iTrunc > 0, '找不到 truncated 分支');
+  assert.ok(iExact > 0, '找不到 exact 分支');
+  // 顺序：截断判定必须排在同分判定之前。反了就会出现
+  // 「已把权重改成 10……两边显示为相同分数」这种假成功（V10 复核案例 X）。
+  assert.ok(iTrunc < iExact, '截断分支排在同分分支之后 —— 会把"没到临界点"报成"已打平"');
+  // 措辞必须点明"没到"与"上限"
+  const block = code.slice(iTrunc, iTrunc + 1400);
+  assert.match(block, /调不到精确打平/, '截断提示没有明说"调不到精确打平"');
+  assert.match(block, /并没有精确打平/, '截断提示没有明说"并没有精确打平"');
+  assert.match(block, /MAX_WEIGHT_UI/, '截断提示没有引用权重上限');
+  // 「仍差 X 分」必须是**原始差值**：用 shownGapOf 会写出"仍差 0.0 分"，
+  // 和紧邻的"并没有精确打平"自相矛盾。
+  assert.equal(/仍差 \$\{shownGapOf\(actual\)\}/.test(block), false, '截断提示用了显示差值（会写成"仍差 0.0 分"）');
+  assert.match(block, /仍差 \$\{fmt1\(Math\.abs\(actual\?\.difference \?\? 0\)\)\}/, '截断提示没有使用原始差值');
+});

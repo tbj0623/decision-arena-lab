@@ -1207,15 +1207,24 @@ function buildFlipSlider(flip) {
       const truncated = actualShare != null && Math.abs(actualShare - targetShare) > 0.0005;
 
       let msg;
-      if (tieLevel === 'exact') {
+      // 顺序很重要：**先检查是否被输入上限截断**，再谈同分。
+      //
+      // 历史缺陷（V10 复核，界面可复现）：案例 X 点「跳到精确临界点」时
+      // 需要权重 10.5，而滑杆上限是 10，实际只能给到 10。旧代码把 display
+      // 同分分支放在 truncated 前面，于是提示说
+      //   「已把权重真的改成 10……两边显示为相同分数」
+      // ——完全没交代"根本没到临界点"，属于典型的假成功。
+      const need = truncated ? (targetShare * (totalW - (appliedWeight ?? 0))) / (1 - targetShare) : null;
+      if (truncated) {
+        const nowText = tieLevel === 'display'
+          ? `现在只能给到 ${appliedWeight}（占比 ${pct(actualShare, 2)}）——两边显示为相同分数（四舍五入到 1 位小数），但原始计算仍差 ${fmt1(Math.abs(actual?.difference ?? 0))} 分，并没有精确打平。`
+          : `现在只能给到 ${appliedWeight}（占比 ${pct(actualShare, 2)}），两边仍差 ${fmt1(Math.abs(actual?.difference ?? 0))} 分。`;
+        msg = `调不到精确打平。需要「${flip.label}」的权重约 ${need.toFixed(1)}，但权重滑杆上限是 ${MAX_WEIGHT_UI}。${nowText}` +
+          '——这条结论只能靠调整评分来验证，不是调权重能解决的。';
+      } else if (tieLevel === 'exact') {
         msg = `已把「${flip.label}」的权重真的改成 ${appliedWeight}（占比 ${pct(actualShare ?? targetShare, 4)}）。上方结果、左侧权重滑杆、导出数据都已同步——两边分数完全相同。`;
       } else if (tieLevel === 'display') {
         msg = `已把「${flip.label}」的权重真的改成 ${appliedWeight}（占比 ${pct(actualShare ?? targetShare, 4)}）。上方结果、左侧权重滑杆、导出数据都已同步——两边显示为相同分数（四舍五入到 1 位小数），原始计算存在细微差异。`;
-      } else if (truncated) {
-        const need = (targetShare * (totalW - (appliedWeight ?? 0))) / (1 - targetShare);
-        msg = `调不到。要打平需要「${flip.label}」的权重约 ${need.toFixed(1)}，但权重滑杆上限是 ${MAX_WEIGHT_UI}。` +
-          `现在只能给到 ${appliedWeight}（占比 ${pct(actualShare, 2)}），两边仍差 ${fmt1(Math.abs(actual.difference))} 分。` +
-          `——这条结论只能靠调整评分来验证，不是调权重能解决的。`;
       } else if (actual) {
         msg = `已把「${flip.label}」的权重改成 ${appliedWeight}（占比 ${pct(actualShare, 2)}），但两边仍差 ${fmt1(Math.abs(actual.difference))} 分，未达到打平。`;
       } else {
