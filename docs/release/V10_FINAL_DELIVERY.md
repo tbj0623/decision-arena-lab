@@ -140,11 +140,58 @@
 
 ## 7. 发布后回填（合并 / 部署 / 线上复核）
 
-> 本节由发布动作完成后填写。未填写则 §1 的「PASS」仅代表代码与本地证据通过，不代表线上验收通过。
+> 本节记录的是**真正发生过**的发布动作，包括一次失败的部署与两轮修复。没有删掉失败记录。
 
-- 合并方式与合并后 main SHA：`<待填>`
-- Pages workflow run ID / headSha / conclusion / 时间：`<待填>`
-- 线上 5 资源 SHA-256 vs 合并后 main 的 `site/`：`<待填>`
-- 清缓存真实浏览器 smoke（首屏分数 / 9 示例 / 跳转打平 / 导出 / 分享 / 打印 / console）：`<待填>`
-- 5–10 分钟后二次 smoke：`<待填>`
-- 回滚锚点（线上版本）：`<待填>`
+### 7.1 三个 PR 与合并结果
+
+| 步骤 | PR | 合并后 main SHA | Pages run | 结果 |
+|---|---|---|---|---|
+| 首轮（P0-1 + P1 全部改动，11 提交） | [#1](https://github.com/tbj0623/decision-arena-lab/pull/1) | `6777389` | 41009122295 | **失败** — `Test before deploy` fail 2：我的 push 安全测试依赖「当前分支不是 main」，而 runner 检出在 main 上 |
+| 修 CI 假红（1 个测试文件） | [#2](https://github.com/tbj0623/decision-arena-lab/pull/2) | `aab4194` | 41009444667 | success ✅ |
+| 修独立审查的 2 条阻断 + 4 条 P2 | [#3](https://github.com/tbj0623/decision-arena-lab/pull/3) | `9baa394` | 41010536505 | success ✅ |
+
+**本次验收所指的代码版本 = `9baa3948332cd92bf2487c13de5020f3a44a4527`**（PR #3 的合并提交）。
+首轮失败暴露的正是「只在本机分支成立」的测试缺陷，属于真实收获，已修成不依赖分支。
+后续任何 docs-only 提交会改变 main SHA，但**不改变 `site/` 字节**（GitHub Pages 只发布 `site/`）。
+
+### 7.2 版本链路（`VERIFIED-REMOTE`）
+
+- 合并后 main：`9baa3948332cd92bf2487c13de5020f3a44a4527`
+- Pages workflow run：**41010536505**，`headSha = 9baa3948332c…`，`conclusion = success`，创建时间 `2026-10-30T05:49:14Z`（= `13:49:14 +08:00`）
+- 首次线上复核时间：`2026-10-30T05:50:59Z`（= `13:50:59 +08:00`）
+
+### 7.3 线上资源 vs 本地（CDP 禁缓存 + 缓存破坏参数，`VERIFIED-LIVE`）
+
+| 资源 | HTTP | 字节 | 线上 SHA-256（前 16） | 与本地 |
+|---|---|---|---|---|
+| `index.html` | 200 | 21670 | `0be44fd739d0d84e` | ✅ 一致 |
+| `app.mjs` | 200 | 95254 | `60e9b19bab436d60` | ✅ 一致 |
+| `core.mjs` | 200 | 34874 | `1a38f360aa2da4b4` | ✅ 一致 |
+| `precision.mjs`（本轮新增） | 200 | 6630 | `657e3e9b2547fcac` | ✅ 一致 |
+| `styles/app.css` | 200 | 102343 | `2e4d0e6850f8dc2d` | ✅ 一致 |
+| `features/narrative.mjs` | 200 | 27111 | `a841d16a67b4449f` | ✅ 一致 |
+
+不存在资源仍返回 404（`this-file-does-not-exist-12345.js`、`styles/no-such-file.css`）。
+
+### 7.4 清缓存真实浏览器 smoke（`VERIFIED-LIVE`，27/27 通过）
+
+CDP `Network.setCacheDisabled` + `clearBrowserCache` + `setBypassServiceWorker`，新 context：
+
+- 首屏「跳到打平点」→ `66.1 / 66.1`，判定句「两个方案分数完全相同——这是最容易被撬动的时刻。」，`aria-live` 区收到同一句
+- 9 个示例逐一点开，A/B 分数与本地 `core.mjs` 独立重算**全部一致**
+- 工作区 display 同分场景 → 屏幕 `51.6 / 51.6`、结果卡「打平（显示精度）」、副文案含「四舍五入」「原始计算存在细微差异」、徽章「显示打平」、贡献表合计 `0.0`
+- 导出 JSON 1170 字节可解析；分享摘要可打开且不含方案名；打印视图结果卡/翻转卡仍在、首屏演示卡已隐藏
+- console error / pageerror / 失败请求 / 跨域请求 全 **0**
+
+### 7.5 5.5 分钟缓存窗口二次 smoke（`VERIFIED-LIVE`，12/12 通过）
+
+首次复核 `05:50:59Z` → 二次 `05:57:18Z`（间隔 6 分 19 秒 > `max-age=600`），用**不带缓存破坏参数**的普通请求：
+
+- 6 个资源全部 200 且 SHA-256 仍与本地一致；响应头 `x-cache: MISS`、`age: 0`（不是缓存旧副本）
+- 首屏 `70.7 / 63.6`、9 张示例卡、`precision.mjs` 被真实加载（200）、0 console 错误、0 站外请求
+
+### 7.6 线上回滚锚点
+
+- **上一线上版本**：`f763e9b7394f84fedd55c359ef14763525f49ec0`（run 40964031616），tag `v10-baseline-pre-fix`
+- **回滚方式**：`git revert` 对应提交（已演练，见 §3.5）→ 推送 → Pages 自动重新部署；**禁止** `reset --hard` + force push
+- 若需整轮回滚：依次 revert PR #3、#2、#1 的合并提交，再确认 run success + 线上 6 资源哈希回到 `f763e9b` 的值
