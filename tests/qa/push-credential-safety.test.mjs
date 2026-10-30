@@ -247,13 +247,35 @@ test('失败分类：网络 / 认证 / 非快进 / 仓库不存在 / 未知 各�
   }
 });
 
-test('进程层：--check 退出 0，输出无凭据形状，且明确显示无内嵌凭据', () => {
+/** 本机/CI 是否配置了 git 凭据助手（决定 --check 的预期结果） */
+function hasCredentialHelper() {
+  const probes = [
+    ['credential.https://github.com.helper'],
+    ['credential.helper'],
+  ];
+  return probes.some((args) => {
+    const r = spawnSync('git', ['config', '--get-all', ...args], { encoding: 'utf8', cwd: ROOT });
+    return r.status === 0 && r.stdout.trim() !== '';
+  });
+}
+
+test('进程层：--check 有 helper 时退出 0；无 helper 时必须明确拒绝并给修复指引', () => {
   const res = spawnSync(process.execPath, [PUSH_SCRIPT, '--check'], { encoding: 'utf8', cwd: ROOT });
   const out = `${res.stdout}${res.stderr}`;
-  assert.equal(res.status, 0, `--check 失败：${out}`);
   assert.equal(containsSecretShape(out), false, '--check 输出里出现凭据形状');
-  assert.match(out, /无内嵌凭据/, '预检没有报告 remote URL 无凭据');
-  assert.match(out, /credential/, '预检没有报告 credential helper 状态');
+
+  if (hasCredentialHelper()) {
+    assert.equal(res.status, 0, `--check 失败：${out}`);
+    assert.match(out, /无内嵌凭据/, '预检没有报告 remote URL 无凭据');
+    assert.match(out, /credential/, '预检没有报告 credential helper 状态');
+  } else {
+    // GitHub Actions 的 runner 上既没有 credential helper、也没有 gh：
+    // 此时**正确行为是明确拒绝推送**（退出 3）并给出官方修复命令，
+    // 绝不能"什么都不说就继续"。这条分支和成功路径同样重要，不能用 skip 糊过去。
+    assert.equal(res.status, 3, `无 helper 时应退出 3，实际 ${res.status}：${out}`);
+    assert.match(out, /没有可用的 credential helper/, '无 helper 时没有明确报错');
+    assert.match(out, /gh auth setup-git --hostname github\.com/, '无 helper 时没有给出官方修复命令');
+  }
 });
 
 test('进程层：拒绝直接推 main（退出 2）', () => {
