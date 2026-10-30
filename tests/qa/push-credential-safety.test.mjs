@@ -99,6 +99,9 @@ function stripComments(src) {
 /** 后缀标记，让假 token 不会被本文件的静态扫描误认成真密钥。 */
 const FAKE = ['gho', 'FAKEfakeFAKEfakeFAKEfake0123456789'].join('_');
 
+/** 进程层测试统一用这个安全分支名，避免"运行者当前在哪个分支"影响结果（见 --check 那条注释）。 */
+const SAFE_BRANCH = 'audit/ci-probe';
+
 test('P0-1：scripts/push.mjs 不再调用 gh auth token', async () => {
   const code = stripComments(await readFile(PUSH_SCRIPT, 'utf8'));
   assert.equal(/['"]auth['"]\s*,\s*['"]token['"]/.test(code), false, '源码仍然把 gh auth token 当子命令调用');
@@ -260,7 +263,12 @@ function hasCredentialHelper() {
 }
 
 test('进程层：--check 有 helper 时退出 0；无 helper 时必须明确拒绝并给修复指引', () => {
-  const res = spawnSync(process.execPath, [PUSH_SCRIPT, '--check'], { encoding: 'utf8', cwd: ROOT });
+  // 关键：必须显式传 --branch，不能依赖"当前检出的分支"。
+  // 踩过的坑（CI 上真实发生）：actions/checkout 把仓库检出在 main 分支上，
+  // 而 scripts/push.mjs 会**先**拒绝受保护分支（退出 2），于是这里期望的
+  // 退出 3 / "不匹配" 全部落空 —— 本地因为在 audit 分支上所以一直是绿的。
+  // 测试不该依赖运行者当前在哪个分支。
+  const res = spawnSync(process.execPath, [PUSH_SCRIPT, '--check', '--branch', SAFE_BRANCH], { encoding: 'utf8', cwd: ROOT });
   const out = `${res.stdout}${res.stderr}`;
   assert.equal(containsSecretShape(out), false, '--check 输出里出现凭据形状');
 
@@ -285,7 +293,11 @@ test('进程层：拒绝直接推 main（退出 2）', () => {
 });
 
 test('进程层：--expect 不匹配时拒绝（防止推错 owner/repo）', () => {
-  const res = spawnSync(process.execPath, [PUSH_SCRIPT, '--check', '--expect', 'someone-else/other-repo'], { encoding: 'utf8', cwd: ROOT });
+  // 同样必须显式传 --branch：否则在 CI（检出在 main 上）会先撞上受保护分支拦截，
+  // 拿到的报错是"拒绝直接推受保护分支"而不是"不匹配"，断言就会假红。
+  const res = spawnSync(process.execPath, [
+    PUSH_SCRIPT, '--check', '--branch', SAFE_BRANCH, '--expect', 'someone-else/other-repo',
+  ], { encoding: 'utf8', cwd: ROOT });
   assert.equal(res.status, 2, `应退出 2，实际 ${res.status}`);
   assert.match(`${res.stdout}${res.stderr}`, /不匹配/);
 });
