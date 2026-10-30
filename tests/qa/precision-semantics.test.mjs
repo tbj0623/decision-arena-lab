@@ -214,6 +214,7 @@ test('M11 滑杆步长不足：真实可达的 0.5 档位上，临界点落在�
   const shifted = structuredClone(CAPPED);
   shifted.factors[2].ratings = { A: 7.4, B: 5 };
   const tS = findFlipThresholds(shifted).find((t) => t.factorId === 'f2');
+  assert.ok(tS, 'M11 的前提失效：shifted 用例里找不到 f2 的阈值（样本一变就会静默空跑）');
   if (tS && typeof tS.thresholdShare === 'number') {
     const w = (tS.thresholdShare * 12) / (1 - tS.thresholdShare);
     const nearest = Math.round(w * 2) / 2;
@@ -387,7 +388,10 @@ test('M20 跳到临界点被上限截断：先报「调不到」再谈同分，�
   // 「仍差 X 分」必须是**原始差值**：用 shownGapOf 会写出"仍差 0.0 分"，
   // 和紧邻的"并没有精确打平"自相矛盾。
   assert.equal(/仍差 \$\{shownGapOf\(actual\)\}/.test(block), false, '截断提示用了显示差值（会写成"仍差 0.0 分"）');
-  assert.match(block, /仍差 \$\{fmt1\(Math\.abs\(actual\?\.difference \?\? 0\)\)\}/, '截断提示没有使用原始差值');
+  // 差距必须用 fmtGap：显示级同分的 |Δ| 可能 < 0.05，fmt1 会打成 "0.0"，
+  // 与同一句的「并没有精确打平」自相矛盾（对抗性审查 B1）。
+  assert.match(block, /仍差 \$\{fmtGap\(actual\?\.difference \?\? 0\)\}/, '截断提示没有使用 fmtGap');
+  assert.equal(/仍差 \$\{fmt1\(/.test(block), false, '截断提示又退回 fmt1 了');
 });
 
 /* ───────── M21：阈值展示精度（历史 P0：1 位小数会造成假承诺）───────── */
@@ -417,4 +421,69 @@ test('M21 阈值展示必须是 2 位小数，且另给 4 位"精确"值', async
   assert.equal(/pct\(t,\s*2\)/.test(code), false, '仍有手写 pct(t, 2)');
   assert.ok((code.match(/fmtThresholdShare\(/g) || []).length >= 4, 'fmtThresholdShare 调用点太少');
   assert.ok(/fmtThresholdShareExact\(/.test(code), '缺少"精确"形态的使用');
+});
+
+/* ───────── M22：差距格式化（非零绝不打印 0.0）───────── */
+
+test('M22 fmtGap：非零差距绝不打印成 0.0（对抗性审查 B1）', async () => {
+  const { fmtGap, fmtGapSigned } = await import('../../site/precision.mjs');
+  // 只有真正的 0 才是 0.0
+  assert.equal(fmtGap(0), '0.0');
+  assert.equal(fmtGapSigned(0), '0.0');
+  // 比 0.05 小但不能说成 0：显示级同分的典型值（|Δ| 恒 < 0.1）
+  assert.equal(fmtGap(0.0495), '<0.05');
+  assert.equal(fmtGap(-0.0495), '<0.05', '负值按绝对值格式化');
+  assert.equal(fmtGapSigned(0.04), '±0.05 以内');
+  assert.equal(fmtGapSigned(-0.04), '±0.05 以内');
+  // 0.05–1 用两位小数并去掉多余的 0
+  assert.equal(fmtGap(0.082), '0.08');
+  assert.equal(fmtGap(-0.082), '0.08');
+  assert.equal(fmtGap(0.8), '0.8');
+  assert.equal(fmtGapSigned(0.082), '+0.08');
+  assert.equal(fmtGapSigned(-0.082), '−0.08');
+  // ≥1 与页面其它分数显示一致（1 位小数）
+  assert.equal(fmtGap(7.1429), '7.1');
+  assert.equal(fmtGapSigned(-7.1429), '−7.1');
+  // 关键不变量：任何非零值都不得渲染成 0.0
+  for (const v of [1e-9, 0.001, 0.02, 0.049, 0.05, 0.082, 0.1, 0.99, 1]) {
+    assert.notEqual(fmtGap(v), '0.0', 'v=' + v + ' 被打成了 0.0');
+  }
+});
+
+/* ───────── M23：叙事文案不得把「细微差异」打印成 0.0（审查 B1 回归）───────── */
+
+test('M23 显示同分且 Δ<0.05：叙事句不得出现「只差 0.0 分」', async () => {
+  const { buildViewpoints } = await import('../../site/features/narrative.mjs');
+  // 对抗性审查给出的 0.5 步进可达反例：6 因素、权重 0.5/10×5、
+  // 评分 A 全 5、B 仅 f1=4.5 → 50.0000 / 49.9505（Δ=0.0495，显示 50.0/50.0）
+  const rest = ["f2", "f3", "f4", "f5", "f6"];
+  const body = {
+    title: 't', options: [{ label: '甲' }, { label: '乙' }],
+    factors: [
+      { id: 'f1', label: '因素1', weight: 0.5, ratings: { A: 5, B: 4.5 } },
+      ...rest.map((id, i) => ({ id, label: "因素" + (i + 2), weight: 10, ratings: { A: 5, B: 5 } })),
+    ],
+  };
+  const analysis = scoreDecision(body);
+  assert.equal(tieLevelOf(analysis), 'display');
+  assert.ok(Math.abs(analysis.difference) > 0 && Math.abs(analysis.difference) < 0.05, '前提：Δ 落在 (0, 0.05)');
+  const vp = buildViewpoints(analysis, pickFlipHighlight(findFlipThresholds(body)), null);
+  const all = vp.chair.text + " " + vp.support.text + " " + vp.oppose.text;
+  assert.equal(/只差 0\.0 分/.test(all), false, '把细微差异打成了 0.0：' + all);
+  assert.equal(/\+0\.0[^0-9]/.test(all), false, '把单项贡献打成 +0.0：' + all);
+  // 但必须仍然说清"有差距"
+  assert.match(vp.chair.text, /<0\.05|细微差异/, vp.chair.text);
+});
+
+/* ───────── M24：翻转卡的"立刻分出胜负"只能用在 exact 上（审查 B2）───────── */
+
+test('M24 翻转卡打平分支必须按 exact/display 分句', async () => {
+  const code = stripComments(await readFile(APP, "utf8"));
+  const at = code.indexOf("任何一点权重变化都会立刻让某一边领先");
+  assert.ok(at > 0, "找不到那句「任何一点权重变化都会立刻让某一边领先」");
+  // 它必须被 tieLevel === "exact" 守卫，否则显示同分时也会说"立刻分出胜负"
+  const before = code.slice(Math.max(0, at - 1200), at);
+  assert.match(before, /tieLevel === .exact./, "这句「立刻分出胜负」没有按 exact 级守卫");
+  // display 级必须有对应措辞（说明屏幕同数只是四舍五入、翻盘点看阈值）
+  assert.match(code, /但这只是四舍五入——原始计算仍有一点差距/, "缺少 display 级的翻转卡说明");
 });

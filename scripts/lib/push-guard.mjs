@@ -63,8 +63,12 @@ export function parseRemoteUrl(url) {
   const userinfo = schemeMatch ? schemeMatch[1] : '';
   if (userinfo.includes('@')) {
     const beforeAt = userinfo.slice(0, userinfo.lastIndexOf('@'));
-    // ssh 形态的 git@host 不是凭据，是固定用户名
-    if (!(beforeAt === 'git' && /^git@[^/]+:.+/.test(raw))) {
+    // ssh 形态里 `git` 是固定用户名，不是凭据 —— 三种写法都要放行：
+    //   scp 形态    git@github.com:owner/repo.git
+    //   ssh URL     ssh://git@github.com/owner/repo.git
+    //   ssh 带端口  ssh://git@github.com:2222/owner/repo.git
+    // 旧实现只认 scp 形态，另两种会被误判成"内嵌凭据"并给出误导性理由（审查 P2）。
+    if (beforeAt !== 'git') {
       return { ok: false, reason: 'remote URL 内嵌了凭据（userinfo），必须先改为无凭据 URL' };
     }
   }
@@ -83,6 +87,8 @@ export function parseRemoteUrl(url) {
     }
   }
 
+  // 去掉可能带的端口：ssh://git@github.com:2222/owner/repo.git 的 host 段会是 github.com:2222
+  host = host.replace(/:\d+$/, '');
   if (!host || !path) return { ok: false, reason: 'remote URL 不是可识别的仓库地址' };
   if (host.includes('@') || path.includes('@')) return { ok: false, reason: 'remote URL 内嵌了凭据（userinfo），必须先改为无凭据 URL' };
 

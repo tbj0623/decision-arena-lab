@@ -22,7 +22,7 @@ import {
 } from './core.mjs';
 
 import {
-  fmt1, tieLevelOf, shownGapOf, signedShownGap,
+  fmt1, tieLevelOf, shownGapOf, signedShownGap, fmtGap,
   fmtThresholdShare, fmtThresholdShareExact,
 } from './precision.mjs';
 
@@ -854,14 +854,25 @@ function renderFlip(analysis, thresholds, flip) {
     //   → 分数 51.64 / 51.56，显示同分 51.6/51.6，四个阈值全是 BOUNDARY。
     //   f1 是 5 对 4.5，旧文案却硬说"评分完全一样"。
     const allGapsZero = (analysis.contributions || []).every((c) => Math.abs(c.delta) < TIE_EPSILON);
-    box.append(el('p', {
-      class: 'result-empty',
-      text: anyFeasible
+    // 这些句子必须再按 tieLevel 分一次：把"精确同分"的说法套到"显示同分"上就是撒谎。
+    // 对抗性审查 B2（界面 0.5 步进可达）：显示同分 + 有可行阈值时，
+    // 数值上其实已经有一方领先 0.082 分，微调权重并不会立刻分出胜负 ——
+    // 说"任何一点权重变化都会立刻让某一边领先"，会与同一张卡的
+    // 「拖到 33.87%」（要挪 1.08 个百分点）直接打架。
+    let bodyText;
+    if (tieLevel === 'exact') {
+      bodyText = anyFeasible
         ? '任何一点权重变化都会立刻让某一边领先。所以此刻真正该问的不是"怎么调权重"，而是"我对哪一项最没把握"——去核实那一项。'
         : allGapsZero
           ? '你给两个方案在每个因素上的评分完全一样，所以调权重不会有任何变化（没有哪一项在往里加分）。真正要做的是先把评分打出差别——去核实事实，而不是纠结权重。'
-          : '两边只差不到显示精度的距离（四舍五入后是同一个数），但每个因素的差距方向一致，所以调单个因素的权重也翻不过来。想改变结论，只能把某一项的评分打出真实差距——去核实事实，别再纠结权重。',
-    }));
+          : '两边分数完全相同，但各因素的差距正好互相抵消了，所以调单个因素的权重也翻不过来。想改变结论，只能把评分本身打出真实差距——去核实事实。';
+    } else {
+      // display 级：屏幕上是同一个数，但原始计算仍有一点差距，翻盘需要明确的幅度。
+      bodyText = anyFeasible
+        ? '屏幕上是同一个数，但这只是四舍五入——原始计算仍有一点差距。真正的翻盘点见下面的阈值与滑杆（需要挪动多少会明确写出来）；此刻真正该问的是"我对哪一项最没把握"。'
+        : '两边只差不到显示精度的距离（四舍五入后是同一个数），但每个因素的差距方向一致，所以调单个因素的权重也翻不过来。想改变结论，只能把某一项的评分打出真实差距——去核实事实，别再纠结权重。';
+    }
+    box.append(el('p', { class: 'result-empty', text: bodyText }));
     box.append(buildThresholdList(thresholds));
 
     // 打平分支已经把「现在是什么状态」讲清楚了，所以**不要再显示第二条 headline**。
@@ -1222,8 +1233,10 @@ function buildFlipSlider(flip) {
       const need = truncated ? (targetShare * (totalW - (appliedWeight ?? 0))) / (1 - targetShare) : null;
       if (truncated) {
         const nowText = tieLevel === 'display'
-          ? `现在只能给到 ${appliedWeight}（占比 ${pct(actualShare, 2)}）——两边显示为相同分数（四舍五入到 1 位小数），但原始计算仍差 ${fmt1(Math.abs(actual?.difference ?? 0))} 分，并没有精确打平。`
-          : `现在只能给到 ${appliedWeight}（占比 ${pct(actualShare, 2)}），两边仍差 ${fmt1(Math.abs(actual?.difference ?? 0))} 分。`;
+          // 差距必须用 fmtGap：显示级同分的 |Δ| 可能 < 0.05，
+          // 用 fmt1 会打成「仍差 0.0 分」，与同句的「并没有精确打平」自相矛盾（审查 B1）。
+          ? `现在只能给到 ${appliedWeight}（占比 ${pct(actualShare, 2)}）——两边显示为相同分数（四舍五入到 1 位小数），但原始计算仍差 ${fmtGap(actual?.difference ?? 0)} 分，并没有精确打平。`
+          : `现在只能给到 ${appliedWeight}（占比 ${pct(actualShare, 2)}），两边仍差 ${fmtGap(actual?.difference ?? 0)} 分。`;
         msg = `调不到精确打平。需要「${flip.label}」的权重约 ${need.toFixed(1)}，但权重滑杆上限是 ${MAX_WEIGHT_UI}。${nowText}` +
           '——这条结论只能靠调整评分来验证，不是调权重能解决的。';
       } else if (tieLevel === 'exact') {
@@ -1231,7 +1244,7 @@ function buildFlipSlider(flip) {
       } else if (tieLevel === 'display') {
         msg = `已把「${flip.label}」的权重真的改成 ${appliedWeight}（占比 ${pct(actualShare ?? targetShare, 4)}）。上方结果、左侧权重滑杆、导出数据都已同步——两边显示为相同分数（四舍五入到 1 位小数），原始计算存在细微差异。`;
       } else if (actual) {
-        msg = `已把「${flip.label}」的权重改成 ${appliedWeight}（占比 ${pct(actualShare, 2)}），但两边仍差 ${fmt1(Math.abs(actual.difference))} 分，未达到打平。`;
+        msg = `已把「${flip.label}」的权重改成 ${appliedWeight}（占比 ${pct(actualShare, 2)}），但两边仍差 ${fmtGap(actual.difference)} 分，未达到打平。`;
       } else {
         msg = '调整后没有算出结果，请检查输入。';
       }

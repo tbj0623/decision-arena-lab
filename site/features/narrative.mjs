@@ -12,7 +12,7 @@
 import { pickValidationActions, inferCategory } from '../data/validation-actions.mjs';
 // 同分要分两级：exact 才是"分数完全相同"，display 只是四舍五入后显示相同。
 // 这个文件的 chairLine / sideArgument 也是可见文案，必须共用同一套判据。
-import { tieLevelOf } from '../precision.mjs';
+import { tieLevelOf, fmtGap, fmtGapSigned } from '../precision.mjs';
 
 /** @typedef {{id:string,label:string,weight:number,ratings:{A:number,B:number}}} Factor */
 
@@ -392,7 +392,7 @@ function sideArgument({ sideLabel, own, other, otherLabel, tieLevel }) {
     : `最硬的两条是 ${joinCn(items)}。`;
 
   const tail = other.length > 0
-    ? `但对面「${otherLabel}」在「${other[0].label}」上反过来领先 ${fmt(Math.abs(other[0].delta))} 分，这笔账不能不算。`
+    ? `但对面「${otherLabel}」在「${other[0].label}」上反过来领先 ${fmtGap(other[0].delta)} 分，这笔账不能不算。`
     : '对面在单项上一条反驳都拿不出来，这一边的优势是全面的。';
 
   return `${head}${tail}`;
@@ -430,7 +430,7 @@ function chairLine({ flip, hypothesis, tieLevel, difference, contributions, aLab
     // display 级同分时，屏幕上已经是同一个数了；直接说"提高到 X 就会打平"
     // 会让人以为现在还没打平。补一句：现在只是显示同分，下面说的是**精确**打平点。
     const displayNote = tieLevel === 'display'
-      ? `（注意：你现在看到的两边是四舍五入后同一个数，原始计算还差 ${fmt(Math.abs(difference))} 分；下面讲的是精确打平的位置。）`
+      ? `（注意：你现在看到的两边是四舍五入后同一个数，原始计算还差 ${fmtGap(difference)} 分；下面讲的是精确打平的位置。）`
       : '';
 
     // 现在完全没参与计算的因素，单独说：它一旦被算进来就可能翻盘。
@@ -467,14 +467,16 @@ function chairLine({ flip, hypothesis, tieLevel, difference, contributions, aLab
     // display 级不能说"完全打平"，也不能说"调权重不会有任何变化" ——
     // 原始值其实差一点点，只是四舍五入后看不出来。
     if (tieLevel === 'display') {
-      return `两边显示为相同分数（四舍五入到 1 位小数），原始计算只差 ${fmt(Math.abs(difference))} 分。这个差距小到单个因素的权重怎么调都翻不过来——真正要做的是先把评分打出差别：${ask}`;
+      return `两边显示为相同分数（四舍五入到 1 位小数），原始计算只差 ${fmtGap(difference)} 分。这个差距小到单个因素的权重怎么调都翻不过来——真正要做的是先把评分打出差别：${ask}`;
     }
     return `两边现在完全打平${allFlat ? '，而且每个因素的评分都一样' : ''}。这种局面下调权重不会有任何变化，因为没有任何一项在往里加分。真正要做的是先把评分打出差别——${ask}`;
   }
 
   // ④ 没有可行阈值，但确实分出胜负：各因素方向一致，翻不过来
   const leadLabel = difference > 0 ? `「${aLabel}」` : `「${bLabel}」`;
-  const gapText = fmt(Math.abs(difference));
+  // 用 fmtGap：显示级同分时 |Δ| 可能 < 0.05，用 1 位小数会打成 "0.0"，
+  // 与同句里的"细微差异"自相矛盾（对抗性审查 B1）。
+  const gapText = fmtGap(difference);
   // display 级同分走到这里（没有可行阈值）：屏幕上两边是同一个数，
   // 就绝不能说"领先的 0.1 分" —— 那是用户看不到、也验证不了的数字。
   if (tieLevel === 'display') {
@@ -494,7 +496,9 @@ export function firstActionTitle(factorLabel) {
 }
 
 function signed(n) {
-  return `${n > 0 ? '+' : n < 0 ? '−' : ''}${fmt(Math.abs(n))}`;
+  // 不能写成「符号 + fmt(|n|)」：那会把 0.04 打成 "+0.0"，
+  // 与同屏的"原始计算仍有细微差异"互相打脸（对抗性审查 B1）。
+  return fmtGapSigned(n);
 }
 
 function joinCn(items) {
