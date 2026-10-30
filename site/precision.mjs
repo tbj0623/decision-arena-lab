@@ -116,3 +116,51 @@ export function fmtThresholdShare(share) {
 export function fmtThresholdShareExact(share) {
   return `${(share * 100).toFixed(THRESHOLD_SHARE_EXACT_DIGITS)}%`;
 }
+
+/* ───────── 「原始计算的差距」怎么打印 ───────── */
+
+/**
+ * 把"原始计算的差距"格式化成人话：**非零差距绝不打印成 0.0**。
+ *
+ * 踩过的坑（对抗性审查 B1，界面 0.5 步进可达）：
+ * 显示级同分的 `|Δ|` 恒 < 0.1，其中 < 0.05 的用 `toFixed(1)` 会打成 `"0.0"` ——
+ * 而这句话正在说「原始计算存在细微差异」，等于自己把自己的论据否掉。
+ * 实测反例：6 因素、权重 0.5/10×5、评分 A 全 5、B 仅 f1=4.5
+ * → 分数 50.0000 / 49.9505（Δ=0.0495），旧文案输出「原始计算只差 0.0 分」。
+ *
+ * 规则：
+ *   Δ = 0        → "0.0"
+ *   0 < Δ < 0.05 → "<0.05"（说清"有，但很小"，不假装是 0）
+ *   0.05 ≤ Δ < 1 → 两位小数（0.082 → "0.08"，0.80 → "0.8"）
+ *   Δ ≥ 1        → 一位小数（与其他分数显示一致）
+ *
+ * @param {number} n
+ * @returns {string}
+ */
+export function fmtGap(n) {
+  const v = Math.abs(Number(n));
+  if (!Number.isFinite(v)) return '—';
+  if (v === 0) return '0.0';
+  if (v < 0.05) return '<0.05';
+  if (v < 1) {
+    const s = v.toFixed(2);
+    return s.endsWith('0') ? s.slice(0, -1) : s;
+  }
+  return v.toFixed(1);
+}
+
+/**
+ * 带符号的差距（正负号 + fmtGap），用于「折算进总分 +0.08」这类表述。
+ * 负号统一用 U+2212（与全站其它地方一致），不用 ASCII 的 "-"。
+ *
+ * 微小值（0 < |v| < 0.05）不带正负号，写成「±0.05 以内」——
+ * 「+<0.05」「−<0.05」在中文句子里读起来是坏的，而且符号在这里没有信息量。
+ * @param {number} n
+ * @returns {string}
+ */
+export function fmtGapSigned(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v) || v === 0) return '0.0';
+  if (Math.abs(v) < 0.05) return '±0.05 以内';
+  return `${v > 0 ? '+' : '−'}${fmtGap(v)}`;
+}

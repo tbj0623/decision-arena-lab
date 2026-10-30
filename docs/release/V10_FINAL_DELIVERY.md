@@ -42,6 +42,10 @@
 8. 读屏 `sr-only` 按 numeric winner 播「当前更倾向这一项」，与可见区「打平」相反。
 9. 「跳到精确临界点」被权重上限截断（需 10.5 / 上限 10）时，旧分支顺序先命中同分分支 → 报假成功；且提示里「仍差 X 分」用的是显示差值 0.0，与「并没有精确打平」自相矛盾。
 10. 阈值展示精度（历史 P0「调到 39.4% 就会打平」，实测 39.4% 处 Δ=−0.004）没有守卫 → 收进 `fmtThresholdShare`(2 位) / `fmtThresholdShareExact`(4 位)。
+11. **（独立对抗性审查 B1，修复后回归）** 显示级同分的 `|Δ|` 恒 <0.1，其中 <0.05 的用 1 位小数会打印成「原始计算只差 **0.0** 分」——而同一句话正说着「存在细微差异」，自己否掉自己；同一折叠区的论据还会出现「折算进总分 +0.0」。
+    修法：新增 `fmtGap` / `fmtGapSigned`（非零差距绝不打印 0.0：<0.05 写 `<0.05`，0.05–1 两位小数，≥1 一位小数），统一用于 `narrative.mjs` 的 ①②③④ 分支与 `app.mjs` 的截断提示。反例（6 因素、权重 0.5/10×5、评分 A 全 5、B 仅 f1=4.5 → 50.0000/49.9505）现在输出「原始计算只差 <0.05 分」。
+12. **（独立对抗性审查 B2，修复后回归）** 翻转卡把「任何一点权重变化都会立刻让某一边领先」这句**精确同分**才成立的话，套到了显示同分上；而同一张卡又给出「拖到 33.87%」（要挪 1.08 个百分点）的阈值，数值上其实已有一方领先 0.082 分。
+    修法：该分支按 `tieLevel` 分句，display 级改成「屏幕上是同一个数，但这只是四舍五入——原始计算仍有一点差距。真正的翻盘点见下面的阈值与滑杆」。
 
 ## 3. 测试运行结果（不能混淆历史）
 
@@ -49,13 +53,18 @@
 
 | 项目 | 命令 | 结果 | 环境 |
 |---|---|---|---|
-| 单元/契约测试 | `node --test`（无参数） | **253 pass / 0 fail / 0 skipped / 0 todo**，exit 0 | `VERIFIED-LOCAL`，HEAD `dfbcb74`，Node v24.20.0 / Windows 10.0.26300 |
+| 单元/契约测试 | `node --test`（无参数） | **259 pass / 0 fail / 0 skipped / 0 todo**，exit 0 | `VERIFIED-LOCAL`，HEAD `dfbcb74`，Node v24.20.0 / Windows 10.0.26300 |
 | 静态隐私扫描 | `node scripts/check-no-network.mjs` | **PASS**（16 文件 / 363 KB / 0 命中） | `VERIFIED-LOCAL` |
 | 分支基线对照 | 同命令在 `f763e9b` | 215 pass / 0 fail | `VERIFIED-LOCAL`（本轮复跑，非引用旧报告） |
 
 ### 3.2 新增测试与变异测试
 
-- 新增 `tests/qa/precision-semantics.test.mjs`（M01–M21，20 条）与 `tests/qa/push-credential-safety.test.mjs`（17 条）。
+- 新增 `tests/qa/precision-semantics.test.mjs`（M01–M24，24 条）与 `tests/qa/push-credential-safety.test.mjs`（20 条）。
+
+**独立对抗性审查（合并后返回，已按结论修复并重新部署）**：审查覆盖正确性/安全/测试可信度/CSS/文档五类，结论 `修完再合并`，共 2 条阻断（均为文案格式化层，即 §2.1 的 11、12）+ 6 条 P2/P3。
+- 已修：B1、B2；安全侧 `parseRemoteUrl` 不绑定 host（推完却用 `gh api` 核对 GitHub）→ 改为只接受 `github.com`，并把「已推送但无法核对」从 `exit 0` 改成独立退出码 `8`；`ssh://git@host[:port]/repo` 被误判成「内嵌凭据」→ 已支持；`--check` 声称不联网却调用 `gh auth status` → 改为预检模式不探测在线身份。
+- 未修（记入 §5 DEFERRED）：CI 上浏览器级断言仍会 skip（runner 不装 Playwright，渲染层在 CI 无覆盖）；`app.css` 尾部新增的短屏媒体查询与既有同条件块存在顺序依赖；导入 JSON 无体积上限。
+- 文档精度：README / README.en / LIMITATIONS 里「39.39% 处原始差值 2.6e-5」实测应为 `2.6e-3`（`2.6e-5` 只出现在精确 39.3939%）→ 已改并注明。
 - **负向/变异测试 E1–E5**（证明测试不是"永远全绿"，脚本 `work/v10-mutation-tests.mjs`，结果 `work/evidence/v10-mutations.json`）：
 
 | 变异 | 注入内容 | 期望 | 实测 |
@@ -83,7 +92,7 @@
 
 - 缺陷台账：V9 阶段 52 条目 → 识别 4 条同源重复（`B09`→`B01`、`G22`→`B08`、`G25`→`R04`、`R03`→`B01`）→ **48 条唯一缺陷**，另列 V10 追加 3 条（`V10-01`/`V10-02`/`V10-03`）。**不再使用「42」这个数字**（原算式 11+9+17+5 中「一般级」实际列了 27 条）。
 - 7 条旧缺陷没有单一修复提交 → 标「未定位」，**没有编造 SHA**。
-- 隐私：`README*.md` / `docs/` / `marketing/` 与本机路径相关模式命中 **0**；`refs/` 原始报告未入库；被跟踪文件中 `AppData/Roaming/npm` 与 `C:/Users/<用户名>` 命中 **0**（本轮修掉了 `tests/qa/tie-display-consistency.test.mjs` 里写死的本机 Playwright 路径）。
+- 隐私：`README*.md` / `docs/` / `marketing/` 与本机路径相关模式命中 **0**；`refs/` 原始报告未入库；被跟踪文件里「本机 AppData 绝对路径」与「带真实用户名的盘符路径」命中 **0**（本轮修掉了 `tests/qa/tie-display-consistency.test.mjs` 里写死的本机 Playwright 路径，改为运行时用 `npm root -g` / `%APPDATA%` 解析）。
 
 ### 3.5 发布与线上复核
 
@@ -118,6 +127,8 @@
   5. `forced-colors` 下 `.pill[data-tone]` 与 `.score-row[data-side] .bar-fill` 因特异性仍渲染品牌色（对比度 6.10/8.53 达标，属视觉一致性）。
   6. 导入 JSON 无文件体积上限（`validate()` 有结构与数值校验，但超大文件可能卡 UI）。
   7. `origin/main` 跟踪引用可能过期（本轮已 `git fetch` 刷新为 `f763e9b`）。
+  8. CI 上浏览器级断言会 skip：GitHub runner 不装 Playwright，`tests/qa/tie-display-consistency.test.mjs` 走 `t.skip` —— 渲染层在 CI 没有覆盖，只有本机证据。
+  9. `site/styles/app.css` 尾部新增的 `@media (max-height:820px) and (max-width:420px)` 与文件中既有同条件块存在顺序依赖（只覆盖了部分属性），重排 CSS 时要一起看。
 - **当前生产风险**：低。`site/core.mjs` 未改（公式与 `TIE_EPSILON` 不变，无数据结构变更）；改动集中在用户可见文案、一个新增纯函数模块、推送脚本与 CSS 留白。
 - **如需回滚**：`git revert <commit>` 逐个撤销（已演练）；锚点 `v10-baseline-pre-fix` = `f763e9b`；预计影响仅为文案/留白/推送脚本，不涉数据。
 

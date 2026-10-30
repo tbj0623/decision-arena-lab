@@ -350,3 +350,43 @@ test('仓库静态隐私扫描仍然 PASS（新脚本未引入网络请求/持�
   assert.equal(res.status, 0, `静态审计失败：\n${res.stdout}\n${res.stderr}`);
   assert.match(res.stdout, /PASS/);
 });
+
+test('远端解析：ssh:// 与带端口形态不再被误判成「内嵌凭据」', () => {
+  for (const url of ['ssh://git@github.com/o/r.git', 'ssh://git@github.com:2222/o/r.git']) {
+    const r = parseRemoteUrl(url);
+    assert.equal(r.ok, true, url + ' 应被接受');
+    assert.equal(r.host, 'github.com', 'host 必须去掉端口号');
+    assert.equal(r.slug, 'o/r');
+  }
+  // 真正的凭据仍然必须拒绝
+  assert.equal(parseRemoteUrl(`https://user:${FAKE}@github.com/o/r.git`).ok, false);
+});
+
+test('进程层：非 github.com 的 origin 必须提前拒绝（否则会拿错仓库去核对）', () => {
+  const dir = mkdtempSync(join(tmpdir(), "push-host-"));
+  const git = (args) => spawnSync("git", args, {
+    cwd: dir,
+    encoding: "utf8",
+    env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.com", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.com" },
+  });
+  try {
+    assert.equal(git(["init", "-q", "-b", "audit/probe"]).status, 0);
+    assert.equal(git(["commit", "-q", "--allow-empty", "-m", "init"]).status, 0);
+    assert.equal(git(["remote", "add", "origin", "https://evil.example/o/r.git"]).status, 0);
+    const res = spawnSync(process.execPath, [PUSH_SCRIPT, "--check", "--branch", "audit/probe"], { encoding: "utf8", cwd: dir });
+    const out = `${res.stdout}${res.stderr}`;
+    // 推完核对用的是 GitHub 专属的 gh api：非 github.com 必须 fail-closed
+    assert.equal(res.status, 2, `应退出 2，实际 ${res.status}：${out}`);
+    assert.match(out, /只支持 github\.com/, "没有明确拒绝非 github.com 的 origin");
+    assert.equal(containsSecretShape(out), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('进程层：--check 声明不联网就真的不联网（不调 gh auth status）', () => {
+  const res = spawnSync(process.execPath, [PUSH_SCRIPT, "--check", "--branch", SAFE_BRANCH], { encoding: "utf8", cwd: ROOT });
+  const out = `${res.stdout}${res.stderr}`;
+  assert.match(out, /未校验（--check 不联网）/, "认证身份一栏没有标明未联网校验");
+  assert.equal(/Logged in to github\.com/.test(out) && /认证身份.*✓/.test(out), false, '--check 仍然探测了在线身份');
+});

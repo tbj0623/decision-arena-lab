@@ -53,6 +53,7 @@ const EXIT = {
   NON_FF: 5,
   AUTH: 6,
   REMOTE_MISMATCH: 7,
+  VERIFY_UNKNOWN: 8,
 };
 
 const MAX_TRIES = 4;
@@ -118,7 +119,8 @@ const USAGE = `标准推送（不会把凭据放进命令行）
   node scripts/push.mjs --expect <owner/repo>  断言 origin 就是它
 
 退出码：0 成功 / 2 用法或配置不匹配 / 3 缺 credential helper /
-        4 网络重试耗尽 / 5 非快进被拒 / 6 认证失败 / 7 远端 SHA 不一致`;
+        4 网络重试耗尽 / 5 非快进被拒 / 6 认证失败 / 7 远端 SHA 不一致 /
+        8 已推送但无法核对（没有证据，不能算成功）`;
 
 function main() {
   const opts = parseArgs(process.argv.slice(2));
@@ -183,6 +185,13 @@ function main() {
     }
   }
 
+  // 本脚本的"推完核对"依赖 gh api（GitHub 专属），所以 origin 必须绑在 github.com。
+  // 否则会出现「推到了 A 主机、却拿 B 仓库去核对」或者核对 404 之后误报完成
+  // （对抗性审查 P2）。宁可提前拒绝，也不要给出没有证据的"成功"。
+  if (parsed.host !== 'github.com') {
+    fail(EXIT.USAGE, `只支持 github.com 的 origin（当前 host 是 ${parsed.host}）。自定义主机请手工 git push 并自行核对。`);
+  }
+
   // ── 4. credential helper：只检查，不擅自改配置 ──
   const helperRes = run('git', ['config', '--get-all', 'credential.https://github.com.helper']);
   const helpers = helperRes.status === 0 ? helperRes.output.split(/\r?\n/).filter(Boolean) : [];
@@ -192,8 +201,10 @@ function main() {
   const hasAnyHelper = ghHelper || otherHelper || (globalHelper.status === 0 && globalHelper.output.trim() !== '');
 
   // ── 5. 已认证身份（只读身份，token 本身不碰） ──
-  const authRes = run('gh', ['auth', 'status'], { timeout: 12_000 });
-  const authText = `${authRes.output ?? ''}`;
+  // --check 既然声明"不联网"，就真的不联网：`gh auth status` 会向 API 校验令牌。
+  // 预检模式只读本地凭据配置，不探测在线身份（审查 P2）。
+  const authRes = opts.check ? null : run('gh', ['auth', 'status'], { timeout: 12_000 });
+  const authText = authRes ? `${authRes.output ?? ''}` : '';
   const accountMatch = /Logged in to github\.com account ([A-Za-z0-9-]+)/i.exec(authText);
   const account = accountMatch ? accountMatch[1] : '';
 
@@ -204,7 +215,7 @@ function main() {
   say(`  本地 HEAD : ${headSha.slice(0, 12)}  tree: ${treeSha.slice(0, 12)}`);
   say(`  目标分支  : ${branch}  ${isProtectedBranch(branch) ? '(受保护)' : ''}`);
   say(`  凭据助手  : ${ghHelper ? 'gh auth git-credential ✓' : hasAnyHelper ? '其他 helper（可用，但未确认能认证 github.com）' : '缺失 ✗'}`);
-  say(`  认证身份  : ${account ? `${account} ✓` : authRes.status === 0 ? '已登录（身份名解析失败）' : '无法确认（gh auth status 失败，可能是网络）'}`);
+  say(`  认证身份  : ${account ? `${account} ✓` : !authRes ? '未校验（--check 不联网）' : authRes.status === 0 ? '已登录（身份名解析失败）' : '无法确认（gh auth status 失败，可能是网络）'}`);
   say(`  模式      : ${opts.dryRun ? 'dry-run（只演练）' : opts.check ? '仅预检' : '真实推送'}`);
 
   if (!hasAnyHelper) {
@@ -274,8 +285,9 @@ function main() {
   }
 
   if (!remoteSha) {
-    say('⚠ 推完了，但读不到远端 ref（gh 网络抖动）。这不等于失败，请稍后用 gh api 复核。');
-    process.exit(EXIT.OK);
+    // 不能报成功：推送到底有没有落地**没有证据**。
+    // 用独立退出码把"未核对"和"已核对一致"分开，避免把不确定说成完成（审查 P2）。
+    fail(EXIT.VERIFY_UNKNOWN, `已尝试推送，但 ${VERIFY_TRIES} 次都读不到远端 refs/heads/${branch}（gh 网络抖动或权限不足）。这不代表失败，但没有证据说成功——请稍后用 gh api 复核。`);
   }
   if (remoteSha !== headSha) {
     fail(EXIT.REMOTE_MISMATCH, `远端 ${branch} = ${remoteSha.slice(0, 12)}，本地 HEAD = ${headSha.slice(0, 12)}，不一致。`);

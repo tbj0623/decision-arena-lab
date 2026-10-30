@@ -41,7 +41,7 @@ weight share of **39.3939%** (weight `6.5`, i.e. `6.5 / 16.5`): set the weight t
 sides read `66.0606`, with a gap of exactly `0`.
 
 Dragging a slider almost never lands on the algebraic solution. Park it near 39.39% and both sides
-**display** `66.1` while the raw values still differ by about `2.6e-5` — the UI then says
+**display** `66.1` while the raw values still differ by about `2.6e-3` (`2.6e-5` only at the exact 39.3939% point) — the UI then says
 "displayed as the same score (rounded to 1 decimal); the raw calculation still differs slightly"
 and never calls it an exact tie:
 
