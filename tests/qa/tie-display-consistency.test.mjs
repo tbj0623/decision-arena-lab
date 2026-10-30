@@ -18,12 +18,55 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { execFileSync } from 'node:child_process';
 
 // 必须用 fileURLToPath —— 工作区路径含中文（十脑造物局），
 // `new URL(...).pathname` 会给出百分号编码的 %E5%8D%81...，
 // 拼出来的路径读不到文件，而症状是"页面加载了但 JS 没执行、元素找不到"。
 const ROOT = fileURLToPath(new URL('../../site/', import.meta.url));
+
+/**
+ * 解析 Playwright 的入口 URL。
+ *
+ * 为什么不在源码里写死绝对路径：本机把 Playwright 装在全局 npm 目录，
+ * 而那个绝对路径里带着**本机用户名** —— 那是个人路径，不该出现在公开仓库
+ * （V10 发布门禁：无个人路径入库）。改成运行时向 npm 询问全局根目录，
+ * 换机器 / 换用户都不用改代码。
+ */
+async function resolvePlaywrightEntry() {
+  if (process.env.PLAYWRIGHT_ENTRY) return pathToFileURL(process.env.PLAYWRIGHT_ENTRY).href;
+  // ① 项目内能解析到就用项目内的（有 node_modules 的环境）
+  try {
+    return import.meta.resolve('playwright');
+  } catch { /* 继续走全局 */ }
+
+  const candidates = [];
+  // ② 问 npm 要全局目录。
+  //    注意：Windows 上 npm 是 npm.cmd，`execFile` 直接调 .cmd 会 EINVAL，
+  //    必须经过 `cmd /d /s /c`（这里踩过，症状是测试静默变成 skip）。
+  try {
+    const [cmd, args] = process.platform === 'win32'
+      ? ['cmd', ['/d', '/s', '/c', 'npm root -g']]
+      : ['npm', ['root', '-g']];
+    const root = execFileSync(cmd, args, { encoding: 'utf8', timeout: 30000 }).trim();
+    if (root) candidates.push(join(root, 'playwright', 'index.mjs'));
+  } catch { /* 继续走兜底 */ }
+
+  // ③ Windows 全局 npm 的默认位置：%APPDATA%\npm\node_modules。
+  //    用环境变量拼，不写死用户名 —— 换用户/换机器都不用改代码。
+  if (process.platform === 'win32' && process.env.APPDATA) {
+    candidates.push(join(process.env.APPDATA, 'npm', 'node_modules', 'playwright', 'index.mjs'));
+  }
+
+  for (const entry of candidates) {
+    try {
+      await readFile(entry);
+      return pathToFileURL(entry).href;
+    } catch { /* 下一个候选 */ }
+  }
+  throw new Error('找不到 Playwright（可用 PLAYWRIGHT_ENTRY 显式指定入口）');
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -63,9 +106,7 @@ test.after(async () => {
 test('UI 说"打平"时，两个显示出来的分数必须相等（不打平则必须不等）', async (t) => {
   let chromium;
   try {
-    ({ chromium } = await import(
-      'file:///C:/Users/11930/AppData/Roaming/npm/node_modules/playwright/index.mjs'
-    ));
+    ({ chromium } = await import(await resolvePlaywrightEntry()));
   } catch {
     t.skip('环境里没有 Playwright，跳过浏览器级断言');
     return;
