@@ -7,25 +7,30 @@
 **下面这份文件原本假设"全部要手工设置"。实测这个假设是错的** ——
 本机的 `gh` CLI 已认证为仓库 owner，PATCH / PUT 都返回 2xx。
 
-**已经自动设置并回读验证的：**
+**2026-10-30 本轮 `gh api` 回读实测（可复现，见文末命令）：**
 
 | 字段 | 值 |
 |---|---|
-| Description | 把纠结的两个选择拆成因素和权重，算出哪个权重改变多少会让结论翻转。纯前端静态站，不联网、不上传数据、无需登录，公式公开可核验。（63 字符） |
+| Description | 把纠结的两个选择拆成因素和权重，算出哪个权重改变多少会让结论翻转。纯前端静态站，不联网、不上传数据、无需登录，公式公开可核验。 |
 | Homepage | https://tbj0623.github.io/decision-arena-lab/ |
 | Topics | 12 个：`accessibility` `chinese` `decision-making` `decision-support` `github-pages` `multi-criteria-decision-analysis` `no-dependencies` `offline-first` `privacy-first` `sensitivity-analysis` `static-site` `vanilla-javascript` |
-| has_wiki | ❌ 关闭 |
-| has_projects | ❌ 关闭 |
-| has_issues | ✅ 保持开启 |
+| has_wiki | ❌ `false`（关闭） |
+| has_projects | ❌ `false`（关闭） |
+| has_issues | ✅ `true`（开启） |
 
 验证方式：设置后重新 `gh api repos/tbj0623/decision-arena-lab` 独立回读，全部一致。
-详见 `ops/release/GITHUB_METADATA_SET.md`。
+详见 `ops/release/GITHUB_METADATA_SET.md`（内部文件，不在仓库内）。
+
+> **`offline-first` 这个 topic 的准确含义**：它指的是「运行时不发任何外部请求、数据不出本机」，
+> **不是**「离线 PWA」或「可安装的离线应用」。站点没有 Service Worker，Chrome 不会给可安装提示。
+> 对外解释 topic 时请用前者，别用后者。
 
 **仍然需要你手动做的只有一项：Social preview（见文末第 4 节）。**
 GitHub 没有提供设置 Social preview 的公开 API 端点。
 
 > ⚠️ 一个环境坑（记下来省得下次踩）：本机 Git Bash（MSYS）会把 `gh api /repos/...`
-> 的**前导斜杠当成路径转换**，报 `invalid API endpoint: "C:/Users/.../repos/..."`。
+> 的**前导斜杠当成路径转换**，把 `/repos/...` 误当成盘符路径拼进错误信息里
+> （报 `invalid API endpoint`，里面还会带出本机工作目录）。
 > 把前导斜杠去掉（写成 `repos/tbj0623/...`）就正常。
 > 另外 `-f` 传字符串、`-F` 传类型推断（布尔要用 `-F`，否则会被发成 `"false"` 字符串）。
 
@@ -78,12 +83,13 @@ Compare two options, find the exact weight that flips your decision. Runs fully 
 https://tbj0623.github.io/decision-arena-lab/
 ```
 
-- 实测 **HTTP 200**（2026-10-29 22:33）。
-- 当前 API 读到 `homepage` 为**空**——即这一项尚未设置，需要手工填入。
+- 实测 **HTTP 200**（2026-10-30 本轮）。
+- 本轮 `gh api` 回读：`homepage` **已填好**，就是上面这个地址。
+  （本文件早前写着"当前 API 读到 homepage 为空、需要手工填"——那是旧状态，已过期。）
 
 ---
 
-## 3. Topics（建议 12 个）
+## 3. Topics（历史建议稿，实际已设置的是第 1 节那 12 个）
 
 GitHub Topics 用小写、连字符分隔。按"相关性"排序，不堆砌：
 
@@ -101,6 +107,10 @@ static-site
 github-pages
 mit-license
 ```
+
+> **与实际的差异**（2026-10-30 回读）：实际设置里没有 `local-first`、`offline-capable`、`mit-license`，
+> 取而代之的是 `chinese`、`offline-first`、`vanilla-javascript`。以第 1 节的实际清单为准。
+> `offline-capable` 之所以没采用：它容易被读成"可离线安装使用"，而本项目**没有** Service Worker。
 
 ### 取舍说明（为什么不加某些热门词）
 
@@ -231,12 +241,23 @@ https://www.linkedin.com/post-inspector/
 
 ---
 
-## 6. 执行状态清单（供你勾选）
+## 6. 执行状态清单
 
-- [ ] Description 已设置
-- [ ] Website URL 已填入 `https://tbj0623.github.io/decision-arena-lab/`
-- [ ] Topics 已添加 12 个
-- [ ] Social preview 已**在 Settings 中单独上传**（不是仅提交文件）
-- [ ] 已在浏览器里确认仓库首页 About 区域显示正确
+**2026-10-30 本轮 `gh api` 回读结论**：Description / Homepage / Topics / 关 wiki / 关 projects
+这 5 项**已经生效**（值与第 1 节的表逐项一致）。**只有 Social preview 仍是待办。**
 
-> 以上 5 项均为**人工操作项**。本文件不声称其中任何一项已完成。
+- [x] Description 已设置（回读一致）
+- [x] Website URL 已填入 `https://tbj0623.github.io/decision-arena-lab/`（回读一致）
+- [x] Topics 已添加 12 个（回读一致，共 12 条）
+- [ ] Social preview 已**在 Settings 中单独上传**（不是仅提交文件）——**仍需人工操作**
+- [ ] 已在浏览器里确认仓库首页 About 区域显示正确（回读一致 ≠ 你看过页面，建议亲自看一眼）
+
+复核命令：
+
+```bash
+gh api repos/tbj0623/decision-arena-lab \
+  --jq '{description, homepage, topics, wiki: .has_wiki, projects: .has_projects, issues: .has_issues}'
+```
+
+> 除 Social preview 外的各项都有上面的回读证据；**Social preview 一项没有任何证据**，
+> 所以它不能勾。上传是动作，生效是结果，两者之间隔着 CDN 缓存。

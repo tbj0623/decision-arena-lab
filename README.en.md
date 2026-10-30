@@ -17,6 +17,10 @@ No sign-up · Nothing uploaded · Completely free · Works the moment you open i
 
 `Vanilla static site` · `The math is fully open` · `Zero third-party dependencies` · `MIT License`
 
+> **A note on language:** the app's interface is **Chinese only** (`lang="zh-CN"`, no i18n layer).
+> This English README is documentation, **not** an interface translation — nothing here is "done
+> internationalization", and the site does not claim to be bilingual.
+
 </div>
 
 ---
@@ -32,10 +36,16 @@ No sign-up · Nothing uploaded · Completely free · Works the moment you open i
 ![Hero · desktop](docs/screenshots/01-desktop-hero-light.png)
 
 That card on the right is not an illustration. It reads the **same** `EXAMPLES` data as the
-workspace below and runs the **same** `core.mjs`. The exact crossing is about 39.39% of the
-weight (39.3939% to four places); at a 39.4% slider position both sides read 66.1:
+workspace below and runs the **same** `core.mjs`. For this example the exact crossing sits at a
+weight share of **39.3939%** (weight `6.5`, i.e. `6.5 / 16.5`): set the weight to `6.5` and both
+sides read `66.0606`, with a gap of exactly `0`.
 
-![Both sides reading 66.1 at a 39.4% slider position](docs/screenshots/03-desktop-hero-tie.png)
+Dragging a slider almost never lands on the algebraic solution. Park it near 39.39% and both sides
+**display** `66.1` while the raw values still differ by about `2.6e-5` — the UI then says
+"displayed as the same score (rounded to 1 decimal); the raw calculation still differs slightly"
+and never calls it an exact tie:
+
+![Tie state: the exact crossing is 39.3939%, and the screen shows 66.1 on both sides](docs/screenshots/03-desktop-hero-tie.png)
 
 <details>
 <summary>Dark theme / mobile / results screenshots</summary>
@@ -116,10 +126,20 @@ Flip point          Hold one factor's share at t and redistribute
 ```
 
 - **`t*` falls outside 0–1** → it tells you plainly that moving this one factor alone cannot flip the result. **It does not make up a number.**
-- **`|Δ| < 1e-9`** → reported as a tie, with no winner declared. A true tie is that narrow; the slider will usually land beside the exact crossing rather than on it, which is why it reports an approximate `t*` rather than promising that one particular setting hits it exactly.
-- The gap is always computed by subtracting the **unrounded** values, so rounding for display never nudges the result.
+- **`|Δ| < 1e-9`** → an **exact tie** (`TIE_EPSILON = 1e-9`). Read that as "equal within a numerical
+  tolerance", **not** as infinite-precision equality. This is the only level at which the app is
+  allowed to say the scores are *exactly* the same.
+- **Same score after rounding to 1 decimal, but `|Δ|` above 1e-9** → a **display tie**. The app then
+  says "displayed as the same score (rounded), the raw calculation still differs slightly" and never
+  claims an exact tie.
+- **Screen rule:** the screen says "tie" ⇔ the two numbers on screen are identical. The gap line is
+  computed by subtracting the two **displayed** numbers (`66.1 − 66.0 = 0.1`), so you never see two
+  identical scores alongside "A leads by 0.0".
 
-The implementation sits in [`site/core.mjs`](site/core.mjs): **dependency-free pure functions**, usable from both Node and the browser, covered by unit tests. More on the edge cases in [Limitations](docs/LIMITATIONS.md).
+The implementation lives in [`site/core.mjs`](site/core.mjs) (scoring and thresholds) and
+[`site/precision.mjs`](site/precision.mjs) (`fmt1` and the three-level tie test): **dependency-free
+pure functions**, usable from both Node and the browser, covered by unit tests. More on the edge
+cases in [Limitations](docs/LIMITATIONS.md).
 
 ## Quick start
 
@@ -145,8 +165,8 @@ node scripts/check-no-network.mjs  # verify "zero external requests / zero persi
 | Shape | Static front end only — **no build step**, no backend, no database |
 | Dependencies | **Zero runtime dependencies** (no CDN, no external fonts, no analytics SDK) |
 | Storage | **No** `localStorage` / `sessionStorage` / cookies / IndexedDB |
-| Network | **Zero external requests** at runtime, checked automatically by `scripts/check-no-network.mjs` |
-| Computation | [`site/core.mjs`](site/core.mjs) — dependency-free pure functions, with input validation and stable error codes |
+| Network | **Zero external requests** at runtime, checked automatically by `scripts/check-no-network.mjs`. There is **no Service Worker**, so this is **not** an offline PWA and cannot be "installed and opened offline"; the accurate phrasing is "local computation / static site / runs behind a local server" |
+| Computation | [`site/core.mjs`](site/core.mjs) (scoring and thresholds) + [`site/precision.mjs`](site/precision.mjs) (display precision, tie levels) — dependency-free pure functions, with input validation and stable error codes |
 | Tests | `node --test` (no arguments). Covers the math's edge cases, the UI contract, the accessibility contract, and the zero-network and security audits. **The docs deliberately don't hard-code a test count** — it changes daily, so any number here would go stale; go by the `node --test` output, and open an issue if anything fails |
 | Deployment | GitHub Pages (`.github/workflows/pages.yml`) |
 | Export | Generates a JSON file locally in your browser, never through a server |
@@ -188,8 +208,8 @@ The full statement is in [Limitations](docs/LIMITATIONS.md); version history is 
 
 ## Delivery and maintenance
 
-- [V9 final delivery report](docs/release/V9_FINAL_DELIVERY.md) — every requirement checked off, the 32 defects fixed, live measurements, and an honest list of what was *not* done
-- [Rollback plan](docs/release/ROLLBACK_V9.md) — three executable paths
+- [V9 final delivery report](docs/release/V9_FINAL_DELIVERY.md) — every requirement checked off, a **defect ledger (48 unique defects, each with an ID, evidence and commit SHA)**, live measurements, and an honest list of what was *not* done
+- [Rollback plan](docs/release/ROLLBACK_V9.md) — one `git revert` path (force-push is forbidden); the network-blocked-era API procedure is kept only as a dated historical appendix
 
 ## License
 

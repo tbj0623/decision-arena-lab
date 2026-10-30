@@ -31,7 +31,7 @@ node scripts/serve.mjs 3000     # 指定端口
 workflow 会**先跑测试**，测试不过就不会部署：
 
 ```yaml
-- run: node --test tests/
+- run: node --test                      # 不要写成 node --test tests/（Node 24 会把目录当模块）
 - run: node scripts/check-no-network.mjs
 ```
 
@@ -98,10 +98,19 @@ for (const p of ['','app.mjs','core.mjs','styles/app.css','features/narrative.mj
 
 ```bash
 git log --oneline            # 找到目标 commit
-git revert <commit>          # 生成一个反向提交（推荐，保留历史）
-# 或者
-git reset --hard <commit> && git push --force-with-lease
+git revert <commit>          # 生成一个反向提交（唯一推荐方式，保留历史）
+node --test                  # 复测，必须全绿
+node scripts/push.mjs        # 推送（默认拒绝直推 main，发布时加 --allow-main）
 ```
+
+> **不要用 `git reset --hard` + `git push --force-with-lease` 回滚。**
+> 那是本文件早期版本写的做法，已被红线禁止：强推会改写远端历史，
+> 让所有基于旧 SHA 的引用、别人的本地分支、Pages 的部署记录全部失配，
+> 而且它**掩盖**了"改坏了什么"，事后无法审计。
+> `git revert` 产生反向提交，历史完整可查，`scripts/push.mjs` 也不接受任何 force 参数。
+
+回滚后必须验证：首页 200、Console 0 error、核心交互可用、6 个静态资源都能取到（见上一节自检清单）。
+Pages 部署有约 40–60 秒延迟，验证前请等 workflow 变绿，必要时清缓存再测。
 
 ## 备份
 

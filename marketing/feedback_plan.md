@@ -31,7 +31,11 @@
 | `wontfix-by-design` | `#cccccc` | 属于明确的设计取舍，附上 LIMITATIONS 链接 |
 | `needs-info` | `#e99695` | 信息不足，等待补充 |
 
-### Issue 模板（`.github/ISSUE_TEMPLATE/feedback.yml`）
+### Issue 模板（`.github/ISSUE_TEMPLATE/`）
+
+现状（2026-10-30 核对）：`.github/ISSUE_TEMPLATE/` 目录**已存在**，里面有
+`bug_report.yml`、`feature_request.yml`、`config.yml` 三个文件；
+下面这段 `feedback.yml` 是**尚未落地**的建议稿（不要在文档里把它写成已有）。
 
 以下是建议提交给 release-engineer 落地的模板内容。核心原则：**只要可复现的信息，不要身份信息。**
 
@@ -129,8 +133,9 @@ body:
 
 - [x] 站点已部署，且用真实浏览器打开验证过 —— <https://tbj0623.github.io/decision-arena-lab/> ，2026-10-29 实测 HTTP 200（非"workflow 变绿"）
 - [ ] 页面在开发者工具 Network 面板里除本站静态资源外**无其他请求**（上线后需重新验一次，不能只信本地）
-- [ ] GitHub 仓库公开、Issues 已开启 —— 已满足（`private: false`、`has_issues: true`）；但**上述模板与标签尚未就位**，`.github/ISSUE_TEMPLATE/` 目录还不存在
-- [ ] 至少一张真实截图（S1/S2）可用作发布配图 —— 还没有，`docs/screenshots/` 仅有一张过时的 `mobile-360.png`
+- [ ] GitHub 仓库公开、Issues 已开启 —— 已满足（`private: false`、`has_issues: true`）；`.github/ISSUE_TEMPLATE/`
+      已有 `bug_report.yml` / `feature_request.yml` / `config.yml`（2026-10-30 核对），**`feedback.yml` 与上面那套 label 尚未落地**，需人工在网页创建
+- [x] 至少一张真实截图（S1/S2）可用作发布配图 —— 已有：`docs/screenshots/` 9 张真实浏览器截图 + `manifest.json`（含 commit/viewport/DPR/示例数值）；旧的 `mobile-360.png` 已删除
 
 > 若 Day1 开始时上述任一项不满足，**整个 7 天计划顺延**，不要在没准备好的情况下发布再补救。
 

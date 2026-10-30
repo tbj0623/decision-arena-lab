@@ -51,7 +51,10 @@ node scripts/check-no-network.mjs   # 退出码 0 = 通过
 
 GitHub Pages 会记录访问日志（IP、User-Agent），这是 GitHub 作为托管方的行为，不是本工具的代码行为。
 本工具的静态文件里没有任何东西会主动上报。如果你对此有顾虑，可以把 `site/` 整个目录下载下来，
-用 `node scripts/serve.mjs` 在本地打开，完全离线使用。
+用 `node scripts/serve.mjs` 在本地起一个静态服务器打开 —— **数据仍然不出本机**。
+
+> 措辞提醒：这叫「零外部请求 / 本地计算」，**不叫**「离线可用」。
+> 本站**没有 Service Worker**，不是可安装、可离线的 PWA；第一次打开仍然需要能访问托管方或用本地服务器。
 
 ## 清除数据
 
