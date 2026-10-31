@@ -3,13 +3,13 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
-# 只读源码 + 写 Pages + 用 OIDC 换取部署令牌
+# 默认最小权限；Pages 写入权限仅授予实际部署 job。
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # 同一时间只允许一个部署；不要取消正在进行的（否则可能留下半套产物）
 concurrency:
@@ -63,9 +63,13 @@ jobs:
           path: _site
 
   deploy:
+    if: github.event_name != 'pull_request'
     name: Deploy to GitHub Pages
     needs: [test, build]
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

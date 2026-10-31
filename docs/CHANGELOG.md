@@ -15,7 +15,7 @@
 
 **质量与维护**
 
-- GitHub Actions 安装固定版本的 Playwright Chromium，并强制执行浏览器级回归；CI 缺少 Playwright 时测试失败，不再静默跳过。
+- GitHub Actions 在 PR 阶段安装固定版本的 Playwright Chromium 并执行浏览器级回归；只有合并到 main 后才部署，CI 缺少 Playwright 时测试失败，不再静默跳过。
 - 新增导入文件大小边界测试。
 - 评分公式、计算结果与隐私边界不变。
 
