@@ -10,7 +10,7 @@
  * 不锁实现（不检查源码里怎么写），锁用户看到的结果。
  *
  * 用 JSDOM 不行（要真实渲染），所以起一个最小 HTTP 服务 + Playwright 跑。
- * 如果环境没有 Playwright，跳过而不是失败（CI 上没有浏览器时不该红）。
+ * 本地环境没有 Playwright 时允许跳过；CI 必须安装浏览器并执行，缺失时直接失败。
  */
 
 import { test } from 'node:test';
@@ -107,8 +107,14 @@ test('UI 说"打平"时，两个显示出来的分数必须相等（不打平则
   let chromium;
   try {
     ({ chromium } = await import(await resolvePlaywrightEntry()));
-  } catch {
-    t.skip('环境里没有 Playwright，跳过浏览器级断言');
+  } catch (error) {
+    if (process.env.CI) {
+      throw new Error(
+        `CI 必须安装 Playwright，不能跳过浏览器级回归：${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
+      );
+    }
+    t.skip('本地环境里没有 Playwright，跳过浏览器级断言');
     return;
   }
 
@@ -164,6 +170,80 @@ test('UI 说"打平"时，两个显示出来的分数必须相等（不打平则
       `发现 ${contradictions.length} 处自相矛盾：\n` +
         contradictions.slice(0, 5).map((c) => `  · ${c.pct}% → ${c.a}/${c.b}（${c.why}）`).join('\n'),
     );
+  } finally {
+    await browser.close();
+  }
+});
+
+test('UI 导入：超出 1 MiB 在创建 FileReader 前拒绝，正常 JSON 仍可导入', async (t) => {
+  let chromium;
+  try {
+    ({ chromium } = await import(await resolvePlaywrightEntry()));
+  } catch (error) {
+    if (process.env.CI) {
+      throw new Error(
+        `CI 必须安装 Playwright，不能跳过浏览器级回归：${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
+      );
+    }
+    t.skip('本地环境里没有 Playwright，跳过浏览器级断言');
+    return;
+  }
+
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.addInitScript(() => {
+      const NativeFileReader = window.FileReader;
+      window.__fileReaderConstructed = 0;
+      window.FileReader = class extends NativeFileReader {
+        constructor(...args) {
+          super(...args);
+          window.__fileReaderConstructed += 1;
+        }
+      };
+    });
+    await page.goto(baseUrl, { waitUntil: 'networkidle' });
+
+    let dialogMessage = '';
+    page.once('dialog', async (dialog) => {
+      dialogMessage = dialog.message();
+      await dialog.accept();
+    });
+    await page.locator('#import-file').evaluate((input) => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File(
+        [new Uint8Array(1_048_577)],
+        'oversized.json',
+        { type: 'application/json' },
+      ));
+      input.files = transfer.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    assert.match(dialogMessage, /1 MiB/);
+    assert.equal(await page.evaluate(() => window.__fileReaderConstructed), 0,
+      '超大文件必须在创建 FileReader 前被拒绝');
+
+    const decision = {
+      title: 'Import regression',
+      options: [{ id: 'A', label: 'Option A' }, { id: 'B', label: 'Option B' }],
+      factors: [
+        { id: 'f1', label: '发展空间', weight: 3, ratings: { A: 6, B: 5 } },
+        { id: 'f2', label: '稳定性', weight: 3, ratings: { A: 5, B: 6 } },
+        { id: 'f3', label: '时间成本', weight: 3, ratings: { A: 7, B: 5 } },
+        { id: 'f4', label: '兴趣匹配', weight: 3, ratings: { A: 6, B: 7 } },
+      ],
+    };
+    await page.locator('#import-file').evaluate((input, payload) => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([payload], 'valid.json', { type: 'application/json' }));
+      input.files = transfer.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }, JSON.stringify({ app: 'decision-arena', version: 1, decision }));
+    await page.waitForFunction(() =>
+      document.querySelector('#decision-title')?.value === 'Import regression');
+    assert.equal(await page.evaluate(() => window.__fileReaderConstructed), 1,
+      '正常 JSON 应继续通过 FileReader 导入');
   } finally {
     await browser.close();
   }

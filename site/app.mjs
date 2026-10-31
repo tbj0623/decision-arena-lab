@@ -26,6 +26,8 @@ import {
   fmtThresholdShare, fmtThresholdShareExact,
 } from './precision.mjs';
 
+import { checkImportFile } from './import-guard.mjs';
+
 import { EXAMPLES, cloneBody, buildViewpoints, detectHighRisk, highRiskNotice } from './features/narrative.mjs';
 
 /* ───────────── 小工具 ───────────── */
@@ -1356,7 +1358,19 @@ function exportJSON() {
 }
 
 function importJSON(file) {
+  // 必须在 FileReader / JSON.parse 之前检查体积；正常导出文件远小于 1 MiB。
+  const fileCheck = checkImportFile(file);
+  if (!fileCheck.ok) {
+    alert(fileCheck.code === 'FILE_TOO_LARGE'
+      ? '导入文件超过 1 MiB 上限。请选择反悔雷达导出的 JSON 文件。'
+      : '请选择有效的 JSON 文件。');
+    return;
+  }
+
   const reader = new FileReader();
+  reader.onerror = () => {
+    alert('读取 JSON 文件失败。请确认文件可访问后重试。');
+  };
   reader.onload = () => {
     try {
       const parsed = JSON.parse(String(reader.result));
