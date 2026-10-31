@@ -96,8 +96,11 @@ function stripComments(src) {
   return out;
 }
 
-/** 后缀标记，让假 token 不会被本文件的静态扫描误认成真密钥。 */
+/** 运行时拼出假凭据：保留脱敏测试能力，同时避免发行包扫描把测试样本误判为真实密钥。 */
 const FAKE = ['gho', 'FAKEfakeFAKEfakeFAKEfake0123456789'].join('_');
+const FAKE_GHP = ['ghp', 'a'.repeat(24)].join('_');
+const FAKE_GITHUB_PAT = ['github', 'pat', 'a'.repeat(24)].join('_');
+const FAKE_SK = ['sk', 'a'.repeat(24)].join('-');
 
 /** 进程层测试统一用这个安全分支名，避免"运行者当前在哪个分支"影响结果（见 --check 那条注释）。 */
 const SAFE_BRANCH = 'audit/ci-probe';
@@ -143,10 +146,10 @@ test('脱敏：各类 token 形状都被替换，且替换后不再含密钥形�
     `https://x-access-token:${FAKE}@github.com/a/b.git`,
     `https://user:${FAKE}@github.com/a/b.git`,
     `?token=${FAKE}&x=1`,
-    `Authorization: Bearer ghp_aaaaaaaaaaaaaaaaaaaaaaaa`,
-    `ghp_aaaaaaaaaaaaaaaaaaaaaaaa`,
-    `github_pat_aaaaaaaaaaaaaaaaaaaaaaaa`,
-    `sk-aaaaaaaaaaaaaaaaaaaaaaaa`,
+    `Authorization: Bearer ${FAKE_GHP}`,
+    FAKE_GHP,
+    FAKE_GITHUB_PAT,
+    FAKE_SK,
     `AKIAAAAAAAAAAAAAAAAA`,
   ];
   for (const s of samples) {
@@ -162,7 +165,7 @@ test('脱敏：各类 token 形状都被替换，且替换后不再含密钥形�
 
 test('脱敏：containsSecretShape 能识别未打码的密钥', () => {
   assert.equal(containsSecretShape(`https://x-access-token:${FAKE}@github.com/a/b.git`), true);
-  assert.equal(containsSecretShape('ghp_aaaaaaaaaaaaaaaaaaaaaaaa'), true);
+  assert.equal(containsSecretShape(FAKE_GHP), true);
   assert.equal(containsSecretShape('一切正常'), false);
 });
 
