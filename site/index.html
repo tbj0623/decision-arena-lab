@@ -322,6 +322,31 @@
           <p id="scenario-status" class="scenario-status" role="status" aria-live="polite"></p>
           <p class="card-note subtle">只在当前标签页内存中保留一份基准；刷新、切换示例、成功导入或清空都会丢弃。导出 JSON 和分享摘要仅包含当前决策，不包含基准。</p>
         </section>
+
+        <section class="card card-uncertainty" id="uncertainty-card" aria-labelledby="uncertainty-title">
+          <div class="card-head">
+            <h3 id="uncertainty-title"><span class="step-num" aria-hidden="true">8</span> 多项不确定性工作台</h3>
+          </div>
+          <p class="card-note">哪些评分你还拿不准？只勾选这些项，检验它们<strong>同时变化</strong>时当前倾向是否还成立。没有勾选时不猜测。</p>
+          <details id="uncertainty-details" class="disclosure uncertainty-disclosure">
+            <summary>展开：标记不确定评分并联合试算</summary>
+            <div class="uncertainty-config">
+              <label for="uncertainty-radius">每个勾选评分允许独立变化</label>
+              <select id="uncertainty-radius" aria-label="主观评分的最大允许变动幅度">
+                <option value="0.5">上下 0.5 分</option>
+                <option value="1" selected>上下 1 分</option>
+                <option value="2">上下 2 分</option>
+              </select>
+              <div id="uncertainty-controls" class="uncertainty-controls" role="group" aria-label="选择哪些评分的区间不确定"></div>
+              <p class="card-note subtle">未勾选的评分完全固定；上限和下限始终截到 0–10。权重不变；选择不会改写你原先的评分。</p>
+            </div>
+          </details>
+          <div id="uncertainty-output" class="uncertainty-output">
+            <p class="result-empty">先得到有效计算结果，再自行标记不确定的评分。</p>
+          </div>
+          <p id="uncertainty-status" role="status" aria-live="polite" class="uncertainty-status"></p>
+          <p class="card-note subtle">这是主观评分范围下的确定性数学检查，并非成功率、概率、真实世界风险估计或独立评分误差的实证分布。</p>
+        </section>
       </div>
     </div>
 
