@@ -104,6 +104,16 @@ the one that's more worth asking.
 **New: one-rating stress test.** The tool now checks whether changing just **one** subjective rating by **+1 or −1 point** could change the lead, without changing weights or any other ratings. This is a bounded what-if calculation, **not a probability or forecast**.
 
 
+## V2.0 · Joint uncertainty workbench
+
+Step 8 adds an optional, collapsible deterministic interval analysis. **Select only the individual ratings you are genuinely unsure about**, then allow each of those ratings to vary by up to **±0.5, ±1, or ±2 points** (clipped to 0–10). Unselected ratings and all weights remain fixed. The engine calculates the **exact minimum and maximum A−B score difference** across all independent combinations of these ranges. You can inspect a concrete boundary scenario and apply it to your current scores with confirmation and Undo support.
+
+These ranges reflect subjective assumptions, not measured error distributions. **The result is not a probability, confidence level, or forecast**; potential correlations or uncertainty in the weights are outside this model. No selections means no robustness claim. See the [method and limitations](docs/UNCERTAINTY_METHOD.md).
+
+Real Chromium screenshot with a fictional career-offer example (four A scores allowed to vary independently by ±2 points):
+
+<img src="docs/screenshots/12-joint-uncertainty.png" width="520" alt="Joint uncertainty workbench showing four selected ratings, a score difference interval crossing zero, and a deterministic boundary example.">
+
 ## Undo and redo: experiment safely
 
 The toolbar has **Undo** and **Redo** buttons. You can undo confirmed rating/weight edits, factor changes, equal weights, the tipping-point jump, and baseline restoration. The current tab keeps up to **30 steps**; rapid changes to the same slider or input are grouped. A new edit after undo discards the old redo path.
@@ -124,7 +134,8 @@ Only **one in-memory baseline** is stored in the current tab; it disappears on r
 4. Read the "what would flip this" panel — how far a factor's weight share has to go before the two sides tie, and **which assumption is worth checking first**.
 5. Check whether a **single rating ±1 point** would change the result; the number of tested cases is not a probability.
 6. Undo/redo up to 30 edit steps within the current tab.
-7. **Export to JSON** if you want to keep it. Refresh and it's gone; no record is kept.
+7. Optionally use Step 8 to stress-test several uncertain ratings simultaneously.
+8. **Export to JSON** if you want to keep it. Refresh and it's gone; no record is kept.
 
 > **What it is not, in one sentence**: the scores come from ratings and weights **you** typed in. They are a weighted average — **not a success rate, not a forecast, not a measurement**. For high-stakes medical, legal, or financial decisions, talk to a qualified professional; this tool can only help you get the pieces straight.
 

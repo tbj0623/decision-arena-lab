@@ -32,20 +32,11 @@ const EXCLUDE_NAMES = new Set(['node_modules', '.git', '.DS_Store', 'Thumbs.db',
 const EXCLUDE_EXT = new Set(['.zip', '.log', '.bak']);
 
 /**
- * 未启用的实验性模块：**不进发行包**。
- *
- * 为什么（product-owner 的 INTERVAL_DECISION 指出）：interval.mjs 通过了 37 项测试，
- * 但 UI 完全没接入。如果打进发行包，下载者会以为产品有这个功能，
- * 打开却发现界面上找不到——那就是"文档/产物承诺了不存在的东西"，
- * 正是今晚修了一整夜的那类缺陷。
- *
- * 代码仍留在仓库里（site/features/interval.mjs，带 ⚠️ 状态头），
- * 感兴趣的人可以从源码看到；发行包只放**能用的**东西。
+ * V2.0 已启用原区间模块，所有 site/ 内可公开的 ES modules 都属于发行包。
+ * 不再按“旧实验状态”排除文件；未来若需要删除实验功能，应先查清 import 依赖。
+ * tests/qa/release-dependency-closure.test.mjs 会审查本地模块的依赖闭包。
  */
-const EXCLUDE_PATHS = new Set([
-  'site/features/interval.mjs',
-  'tests/core/interval.test.mjs',
-]);
+const EXCLUDE_PATHS = new Set([]);
 
 async function* walk(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
@@ -145,7 +136,7 @@ async function main() {
     } else {
       for await (const file of walk(full)) {
         const rel = relative(ROOT, file).split('\\').join('/');
-        // 实验性/未启用的模块不进发行包（见 EXCLUDE_PATHS 的说明）
+        // 保留未来扩展的明确排除机制，当前不排除任何必需模块。
         if (EXCLUDE_PATHS.has(rel)) continue;
         entries.push({ name: rel, data: await readFile(file) });
       }

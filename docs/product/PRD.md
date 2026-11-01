@@ -81,7 +81,7 @@
 
 | 功能 | 状态 | 说明 |
 |---|---|---|
-| **区间敏感性分析** | ⚠️ **实验性，未启用** | `site/features/interval.mjs`（327 行）+ `tests/core/interval.test.mjs`（37 项全通过）。**零生产引用**——浏览器不会下载它。算法结论为盒约束下的 O(n) 闭式解，输出"稳固 / 可能翻"三态，**不输出概率**。决策见 `ops/product/INTERVAL_DECISION.md`：v1.1 不接 UI，估算 8.5 人时。 |
+| **联合区间敏感性分析（V2.0）** | ✅ **已启用可选工作台** | 原有 `site/features/interval.mjs` 闭式解经 `site/features/uncertainty-workbench.mjs` 接入第八步；用户只需勾选不确定单元格并指定 ±0.5/1/2 分，不需要输入十多个区间端点。固定权重、独立区间联合端点；无概率。旧版 `ops/product/INTERVAL_DECISION.md` 属当时不接 UI 的历史决策，被本版取代。 |
 
 ### 坚决不做
 

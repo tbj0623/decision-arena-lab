@@ -3294,3 +3294,65 @@ main:focus:not(:focus-visible) {
 
 .history-note { margin-top: .85rem; line-height: 1.6; color: var(--ink-2); font-size: var(--fs-sm); }
 @media print { .history-note { display: none !important; } }
+
+
+/* V2.0 · 可选的联合不确定性工作台；默认折叠，不增加首次操作负担。 */
+.card-uncertainty { border-inline-start: 3px solid var(--accent); }
+.uncertainty-config { margin-top: .85rem; }
+.uncertainty-config > label { display: block; font-weight: 650; margin: .5rem 0; }
+#uncertainty-radius {
+  max-width: 100%;
+  min-height: var(--tap);
+  padding: .5rem .8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+}
+.uncertainty-controls {
+  display: grid;
+  gap: .6rem;
+  margin: .8rem 0;
+}
+.uncertainty-factor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .4rem .9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunk);
+  padding: .65rem .8rem;
+  min-width: 0;
+}
+.uncertainty-factor > strong { overflow-wrap: anywhere; }
+.uncertainty-factor-options { display: flex; flex-wrap: wrap; gap: .4rem .8rem; }
+.uncertainty-check { display: inline-flex; gap: .4rem; align-items: center; min-height: 38px; cursor: pointer; }
+.uncertainty-check input { width: 1.15rem; height: 1.15rem; accent-color: var(--brand); }
+.uncertainty-output { margin-top: 1rem; }
+.uncertainty-verdict { margin: 0 0 .4rem; font-weight: 750; font-size: var(--fs-lg); }
+.uncertainty-meta, .uncertainty-numbers { color: var(--ink-2); margin: .45rem 0; }
+.uncertainty-numbers { font-variant-numeric: tabular-nums; font-weight: 650; }
+.uncertainty-range-labels { display: flex; justify-content: space-between; color: var(--ink-2); font-size: var(--fs-xs); gap: .5rem; }
+.uncertainty-chart { margin: .9rem 0 1.1rem; }
+.uncertainty-range { position: relative; height: 1.05rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--bg-sunk); overflow: hidden; }
+.uncertainty-range-zero { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: var(--ink); z-index: 1; }
+.uncertainty-range-fill { position: absolute; top: 2px; bottom: 2px; border-radius: 1rem; background: var(--brand); opacity: .82; }
+.uncertainty-example { margin: .8rem 0; }
+.uncertainty-example > summary { cursor: pointer; font-weight: 650; }
+.uncertainty-changes { padding-inline-start: 1.4rem; margin: .65rem 0; }
+.uncertainty-changes li { padding: .12rem 0; overflow-wrap: anywhere; }
+.uncertainty-empty { color: var(--ink-2); }
+.uncertainty-status { color: var(--accent); font-size: var(--fs-sm); min-height: 1.5em; }
+.card-uncertainty .caveat { color: var(--ink-2); font-size: var(--fs-sm); line-height: 1.6; }
+@media print {
+  .uncertainty-disclosure, .uncertainty-status { display: none !important; }
+  .card-uncertainty { box-shadow: none; break-inside: avoid; }
+}
+@media (forced-colors: active) {
+  .card-uncertainty { border-inline-start-color: CanvasText; }
+  .uncertainty-factor, .uncertainty-range { background: Canvas; border-color: CanvasText; }
+  .uncertainty-range-fill, .uncertainty-range-zero { background: CanvasText; }
+}

@@ -1,16 +1,10 @@
 /**
- * ⚠️ 实验性模块 — 未启用（v1.2 候选）
+ * V2.0 状态：已通过 features/uncertainty-workbench.mjs 连接到可选的第八步工作台。
+ * 原 V1.2 阶段曾因 16 个区间端点输入的操作成本而暂缓接入；现改为逐格勾选 +
+ * 单个 ±0.5/1/2 幅度控件，并保留全部闭式数学与独立 oracle 测试。
  *
- * 状态：
- *   - 零 import：当前**没有任何生产代码**引用本模块，UI 完全未接入
- *   - 已通过：37 项单元测试 + QA 独立 oracle 17/17 数学校验
- *   - 未启用原因：接入成本约 8.5 人时（16 个区间端点输入 + 校验 + 判定整合 +
- *     防概率措辞审 + 回归），且无用户证据表明用户愿意多填 4 倍字段
- *   - 被 PAGES 发布：注意 pages.yml 用 `cp -r site/.` 全量复制，
- *     所以本文件虽未被引用，**确实可以被公开下载**
- *
- * 如果将来要接入：先读 proposals/math/INTERVAL_ANALYSIS.md（数学推导）
- * 和 INTERVAL_IMPLEMENTATION.md（实现差异与踩坑），再做 UI。
+ * 历史技术决策仍见 proposals/math/INTERVAL_ANALYSIS.md 与
+ * ops/product/INTERVAL_DECISION.md；新实现与边界见 docs/UNCERTAINTY_METHOD.md。
  */
 /**
  * Decision Arena — 反悔雷达
