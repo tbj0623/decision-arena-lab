@@ -104,6 +104,12 @@ the one that's more worth asking.
 **New: one-rating stress test.** The tool now checks whether changing just **one** subjective rating by **+1 or −1 point** could change the lead, without changing weights or any other ratings. This is a bounded what-if calculation, **not a probability or forecast**.
 
 
+## Undo and redo: experiment safely
+
+The toolbar has **Undo** and **Redo** buttons. You can undo confirmed rating/weight edits, factor changes, equal weights, the tipping-point jump, and baseline restoration. The current tab keeps up to **30 steps**; rapid changes to the same slider or input are grouped. A new edit after undo discards the old redo path.
+
+**Privacy boundary:** reload, reset, switching examples, and a successful JSON import permanently clear the in-memory edit history. It is not autosave or a backup; export JSON yourself to keep a decision across sessions. The actual UI remains Chinese-only.
+
 ## Compare against a saved baseline
 
 After scoring a decision, click **Save current as baseline** in Step 7. Edit any rating, weight, factor or label to compare the current A/B scores against your snapshot. Restoring the baseline requires confirmation and overwrites unexported edits.
@@ -117,7 +123,8 @@ Only **one in-memory baseline** is stored in the current tab; it disappears on r
 3. Read the two 0–100 scores, the gap between them, and the **per-factor breakdown**.
 4. Read the "what would flip this" panel — how far a factor's weight share has to go before the two sides tie, and **which assumption is worth checking first**.
 5. Check whether a **single rating ±1 point** would change the result; the number of tested cases is not a probability.
-6. **Export to JSON** if you want to keep it. Refresh and it's gone; no record is kept.
+6. Undo/redo up to 30 edit steps within the current tab.
+7. **Export to JSON** if you want to keep it. Refresh and it's gone; no record is kept.
 
 > **What it is not, in one sentence**: the scores come from ratings and weights **you** typed in. They are a weighted average — **not a success rate, not a forecast, not a measurement**. For high-stakes medical, legal, or financial decisions, talk to a qualified professional; this tool can only help you get the pieces straight.
 

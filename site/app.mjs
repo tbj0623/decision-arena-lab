@@ -29,6 +29,7 @@ import {
 import { checkImportFile } from './import-guard.mjs';
 import { probeRatingSensitivity } from './features/rating-sensitivity.mjs';
 import { captureScenario, compareScenarios } from './features/scenario-compare.mjs';
+import { createEditorHistory } from './features/editor-history.mjs';
 
 import { EXAMPLES, cloneBody, buildViewpoints, detectHighRisk, highRiskNotice } from './features/narrative.mjs';
 
@@ -120,6 +121,59 @@ let lastDialogTrigger = null;
 let lastHighRisk = null;
 /** 仅内存中由用户主动保存的一份基准情景。 */
 let savedScenario = null;
+/** 有上限的本标签页撤销历史；不保存到本地存储，不包含基准。 */
+const editHistory = createEditorHistory(state);
+let suspendHistory = false;
+let pendingHistoryGroup = null;
+
+function updateHistoryUI() {
+  const undo = $('#history-undo');
+  const redo = $('#history-redo');
+  if (undo) undo.disabled = !editHistory.canUndo;
+  if (redo) redo.disabled = !editHistory.canRedo;
+}
+
+function setHistoryStatus(message) {
+  const target = $('#history-status');
+  if (target) target.textContent = message;
+}
+
+function historyInputGroup() {
+  const active = document.activeElement;
+  if (!active || !active.matches('input[type="number"], input[type="text"], input[type="range"]')) return null;
+  return active.id ? 'input:' + active.id : null;
+}
+
+function recordHistoryIfChanged() {
+  if (!suspendHistory) {
+    editHistory.record(state, { group: pendingHistoryGroup && historyInputGroup() ? pendingHistoryGroup : null });
+  }
+  pendingHistoryGroup = null;
+  updateHistoryUI();
+}
+
+function moveInHistory(direction) {
+  // 先吸收尚未结算的已确认输入，避免最后一次修改因 90ms 防抖被遗漏。
+  if (recalcTimer !== null) {
+    clearTimeout(recalcTimer);
+    recalcTimer = null;
+    recalc();
+  }
+  const next = direction === 'undo' ? editHistory.undo() : editHistory.redo();
+  if (!next) return;
+  suspendHistory = true;
+  try {
+    state = next;
+    renderAll();
+  } finally {
+    suspendHistory = false;
+    pendingHistoryGroup = null;
+    updateHistoryUI();
+  }
+  setHistoryStatus(direction === 'undo'
+    ? '已撤销一次编辑（当前标签页内）。'
+    : '已重做一次编辑（当前标签页内）。');
+}
 
 /* ───────────── 示例卡 ───────────── */
 
@@ -161,7 +215,9 @@ function loadExample(key) {
   if (!ex) return;
   savedScenario = null;
   state = cloneBody(ex.body);
+  editHistory.reset(state);
   renderAll();
+  setHistoryStatus('已切换示例，旧编辑历史已清除。');
   setScenarioStatus('已切换示例，旧基准已丢弃。');
   const ws = $('#workspace');
   if (ws) ws.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
@@ -463,6 +519,7 @@ function removeFactor(id) {
 
 let recalcTimer = null;
 function scheduleRecalc() {
+  pendingHistoryGroup = historyInputGroup();
   if (recalcTimer !== null) clearTimeout(recalcTimer);
   recalcTimer = setTimeout(() => { recalcTimer = null; recalc(); }, 90);
 }
@@ -478,6 +535,7 @@ function readStateFromInputs() {
 
 function recalc() {
   readStateFromInputs();
+  recordHistoryIfChanged();
 
   const resultBody = $('#result-body');
   const empty = $('#result-empty');
@@ -1492,7 +1550,7 @@ function bindScenarioActions() {
 
   $('#scenario-restore')?.addEventListener('click', () => {
     if (!savedScenario) return;
-    if (!confirm('恢复已保存的基准？当前未导出的修改会被覆盖，无法撤销。')) return;
+    if (!confirm('恢复已保存的基准？当前未导出的修改会被覆盖。可以在刷新或清空之前点击「撤销」找回上一版。')) return;
     state = captureScenario(savedScenario);
     renderAll();
     setScenarioStatus('已恢复基准。基准仍保留，你可以继续尝试不同修改。');
@@ -1580,7 +1638,9 @@ function importJSON(file) {
           ratings: { A: Number(f.ratings.A), B: Number(f.ratings.B) },
         })),
       };
+      editHistory.reset(state);
       renderAll();
+      setHistoryStatus('已导入新决策；旧编辑历史已清除。');
       setScenarioStatus('已成功导入新决策，旧基准已丢弃。');
     } catch {
       alert('这个文件不是反悔雷达导出的 JSON，或者已经损坏。');
@@ -1716,7 +1776,9 @@ function resetAll() {
   if (!confirm('清空当前所有输入？这个操作不能撤销，而且不会留下副本。')) return;
   savedScenario = null;
   state = createEmptyDecision();
+  editHistory.reset(state);
   renderAll();
+  setHistoryStatus('已清空编辑历史，无法撤销清空操作。');
   setScenarioStatus('已清空输入与临时基准。');
   window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
 }
@@ -1988,7 +2050,7 @@ function bindEvents() {
       // 让用户知道刚才发生了什么，而不是默默改掉他们的数字
       const note = $('#equal-weights-note');
       if (note) {
-        note.textContent = '已把所有因素的权重都设为 1（占比相同）。你原来的权重没有备份，需要的话请手动调回。';
+        note.textContent = '已把所有因素的权重都设为 1（占比相同）。可以点击「撤销」恢复调整前的权重。';
         note.hidden = false;
       }
     });
@@ -2000,7 +2062,9 @@ function bindEvents() {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
       const action = btn.dataset.action;
-      if (action === 'export-json') exportJSON();
+      if (action === 'undo') moveInHistory('undo');
+      else if (action === 'redo') moveInHistory('redo');
+      else if (action === 'export-json') exportJSON();
       else if (action === 'import-json') $('#import-file')?.click();
       else if (action === 'reset') resetAll();
       else if (action === 'print') window.print();

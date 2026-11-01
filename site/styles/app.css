@@ -2005,7 +2005,7 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.08); }
   .toolbar .btn-danger { grid-column: auto; }
 }
 @media (min-width: 900px) {
-  .toolbar { grid-template-columns: repeat(6, 1fr); }
+  .toolbar { grid-template-columns: repeat(4, 1fr); }
 }
 .storage-note {
   margin-top: .85rem;
@@ -3291,3 +3291,6 @@ main:focus:not(:focus-visible) {
 @media (forced-colors: active) {
   .scenario-warning { background: Canvas; color: CanvasText; border-inline-start-color: CanvasText; }
 }
+
+.history-note { margin-top: .85rem; line-height: 1.6; color: var(--ink-2); font-size: var(--fs-sm); }
+@media print { .history-note { display: none !important; } }

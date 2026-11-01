@@ -327,6 +327,8 @@
 
     <!-- 工具条 -->
     <div class="toolbar" role="group" aria-label="数据与操作">
+      <button type="button" class="btn btn-ghost" id="history-undo" data-action="undo" disabled>撤销</button>
+      <button type="button" class="btn btn-ghost" id="history-redo" data-action="redo" disabled>重做</button>
       <button type="button" class="btn btn-ghost" data-action="load-example">载入示例</button>
       <button type="button" class="btn btn-ghost" data-action="export-json">导出 JSON</button>
       <button type="button" class="btn btn-ghost" data-action="import-json">导入 JSON</button>
@@ -335,6 +337,7 @@
       <button type="button" class="btn btn-danger" data-action="reset">清空重来</button>
       <input type="file" id="import-file" accept="application/json,.json" aria-label="选择要导入的决策 JSON 文件" hidden>
     </div>
+    <p class="history-note" id="history-status" role="status" aria-live="polite">最多保留最近 30 步编辑历史，仅限当前标签页。清空、刷新、导入或切换示例后不可恢复。</p>
     <p class="storage-note" id="storage-note">
       当前版本<strong>不保存任何数据</strong>：刷新页面就没了。想留住就点"导出 JSON"存到本地。
     </p>

@@ -381,3 +381,159 @@ test('本地基准对比：显式保存、改分、取消恢复、确认恢复�
     await browser.close();
   }
 });
+
+
+test('编辑历史：真实页面撤销／重做、等权回退、结构回退、隐私重置', async (t) => {
+  let chromium;
+  try {
+    ({ chromium } = await import(await resolvePlaywrightEntry()));
+  } catch (error) {
+    if (process.env.CI) {
+      throw new Error('CI 不允许跳过编辑历史 Chromium 回归测试', { cause: error });
+    }
+    t.skip('本地缺少 Playwright');
+    return;
+  }
+
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({
+      viewport: { width: 390, height: 844 },
+      reducedMotion: 'reduce',
+    });
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto(baseUrl, { waitUntil: 'networkidle' });
+    const undo = page.locator('#history-undo');
+    const redo = page.locator('#history-redo');
+
+    assert.equal(await undo.isDisabled(), true);
+    assert.equal(await redo.isDisabled(), true);
+    await page.locator('[data-action="demo-run"]').first().click();
+    await page.waitForFunction(() => !document.querySelector('#scenario-save').disabled);
+    assert.equal(await undo.isDisabled(), true, '载入示例应开启新历史，而非继承之前的历史');
+
+    const initial = await page.locator('#w-f1').inputValue();
+    assert.notEqual(initial, '1', '示例第一个因素与等权不同');
+    await page.locator('#equal-weights').click();
+    assert.equal(await page.locator('#w-f1').inputValue(), '1');
+    assert.match(await page.locator('#equal-weights-note').innerText(), /撤销/);
+    assert.equal(await undo.isDisabled(), false);
+
+    await undo.click();
+    assert.equal(await page.locator('#w-f1').inputValue(), initial);
+    assert.equal(await redo.isDisabled(), false);
+    await redo.click();
+    assert.equal(await page.locator('#w-f1').inputValue(), '1');
+
+    // 连续修改评分：撤销必须作用于真实计算模型，而非只改表面 input。
+    const scoreBefore = await page.locator('#r-f1-A').inputValue();
+    await page.locator('#r-f1-A').fill('0');
+    await page.locator('#r-f1-A').press('Tab');
+    await page.waitForFunction(() => document.querySelector('#r-f1-A')?.value === '0');
+    await page.waitForTimeout(150);
+    await undo.click();
+    assert.equal(await page.locator('#r-f1-A').inputValue(), scoreBefore);
+    await redo.click();
+    assert.equal(await page.locator('#r-f1-A').inputValue(), '0');
+
+    // 撤销后发生新编辑，旧的“重做”路径必须失效。
+    await undo.click();
+    await page.locator('#add-factor').click();
+    assert.equal(await page.locator('#factor-list .factor-item').count(), 5);
+    assert.equal(await redo.isDisabled(), true);
+    await undo.click();
+    assert.equal(await page.locator('#factor-list .factor-item').count(), 4);
+    await redo.click();
+    assert.equal(await page.locator('#factor-list .factor-item').count(), 5);
+
+    // 保存基准并恢复也应支持撤销，且不丢失基准。
+    await page.locator('#scenario-save').click();
+    const beforeRestore = await page.locator('#r-f1-A').inputValue();
+    await page.locator('#r-f1-A').fill('0');
+    await page.locator('#r-f1-A').press('Tab');
+    await page.waitForTimeout(150);
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.locator('#scenario-restore').click();
+    assert.equal(await page.locator('#r-f1-A').inputValue(), beforeRestore);
+    await undo.click();
+    assert.equal(await page.locator('#r-f1-A').inputValue(), '0');
+    assert.equal(await page.locator('#scenario-restore').isDisabled(), false,
+      '基准保留，不应随编辑历史撤销一起被删除');
+
+    // 清空是隐私边界：旧内容不能由撤销找回。
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.locator('.toolbar [data-action="reset"]').click();
+    assert.equal(await undo.isDisabled(), true);
+    assert.equal(await redo.isDisabled(), true);
+    assert.equal(await page.locator('#scenario-restore').isDisabled(), true);
+    assert.match(await page.locator('#history-status').innerText(), /无法撤销清空/);
+
+    const overflow = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    assert.ok(overflow.scrollWidth <= overflow.clientWidth + 2, '390px 手机端不允许横向溢出');
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('编辑历史：切换示例、成功导入、刷新都必须丢弃旧撤销记录', async (t) => {
+  let chromium;
+  try {
+    ({ chromium } = await import(await resolvePlaywrightEntry()));
+  } catch (error) {
+    if (process.env.CI) throw new Error('CI 必须执行浏览器编辑历史边界回归', { cause: error });
+    t.skip('本地缺少 Playwright');
+    return;
+  }
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.goto(baseUrl, { waitUntil: 'networkidle' });
+    await page.locator('[data-action="demo-run"]').first().click();
+    await page.locator('#r-f1-A').fill('0');
+    await page.locator('#r-f1-A').press('Tab');
+    await page.waitForTimeout(150);
+    assert.equal(await page.locator('#history-undo').isDisabled(), false);
+
+    await page.locator('#example-grid [data-example="rent"]').click();
+    assert.equal(await page.locator('#history-undo').isDisabled(), true);
+
+    await page.locator('#r-f1-A').fill('0');
+    await page.locator('#r-f1-A').press('Tab');
+    await page.waitForTimeout(150);
+    assert.equal(await page.locator('#history-undo').isDisabled(), false);
+    await page.reload({ waitUntil: 'networkidle' });
+    assert.equal(await page.locator('#history-undo').isDisabled(), true);
+
+    // 输入合法导入 JSON 的测试流程与真实 FileReader 一致。
+    await page.locator('[data-action="demo-run"]').first().click();
+    await page.locator('#r-f1-A').fill('0');
+    await page.locator('#r-f1-A').press('Tab');
+    await page.waitForTimeout(150);
+    const payload = {
+      app: 'decision-arena', version: 1,
+      decision: {
+        title: '导入后不保留历史',
+        options: [{ id: 'A', label: '甲' }, { id: 'B', label: '乙' }],
+        factors: [1,2,3,4].map((n) => ({
+          id: 'f' + n, label: '因素' + n, weight: 3, ratings: { A: 5, B: 7 },
+        })),
+      },
+    };
+    await page.locator('#import-file').evaluate((input, text) => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([text], 'decision.json', { type: 'application/json' }));
+      input.files = transfer.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }, JSON.stringify(payload));
+    await page.waitForFunction(() => document.querySelector('#decision-title')?.value === '导入后不保留历史');
+    assert.equal(await page.locator('#history-undo').isDisabled(), true);
+    assert.equal(await page.locator('#history-redo').isDisabled(), true);
+  } finally {
+    await browser.close();
+  }
+});
