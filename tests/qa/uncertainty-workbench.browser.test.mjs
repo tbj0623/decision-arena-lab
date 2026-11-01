@@ -10,6 +10,8 @@ const SITE = fileURLToPath(new URL('../../site/', import.meta.url));
 let server, baseUrl;
 
 async function playwrightEntry() {
+  // CI 在隔离的 $RUNNER_TEMP 安装 Playwright，并通过环境变量传入精确入口。
+  if (process.env.PLAYWRIGHT_ENTRY) return pathToFileURL(process.env.PLAYWRIGHT_ENTRY).href;
   try { return import.meta.resolve('playwright'); } catch {}
   const root = process.platform === 'win32'
     ? execFileSync('cmd', ['/d','/s','/c','npm root -g'], {encoding:'utf8'}).trim()
