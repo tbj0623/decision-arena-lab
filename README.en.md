@@ -104,9 +104,19 @@ the one that's more worth asking.
 **New: one-rating stress test.** The tool now checks whether changing just **one** subjective rating by **+1 or −1 point** could change the lead, without changing weights or any other ratings. This is a bounded what-if calculation, **not a probability or forecast**.
 
 
+## V3.0 · Combined rating and weight uncertainty
+
+Step 8 now accepts **both uncertain scores and uncertain raw weights**. Select individual score cells (±0.5, ±1, ±2 points) and/or factor weights (a separate ±0.5, ±1, ±2 original weight units). Unselected inputs remain fixed. The engine computes **exact joint bounds** for A−B while *renormalizing the changed weights*. Inspect a feasible extreme scoring/weighting scenario, optionally apply it with confirmation, then Undo to restore the original values.
+
+A zero-sum weight configuration has no valid weighted average and is excluded. With no uncertain weights, all V2.0 behavior remains unchanged. These are **assumption-bounded deterministic results**, never probabilities or forecasts, and depend on independent-range assumptions.
+
+**Real Chromium screenshot:** four A ratings and four raw weights each vary by up to ±2 units, yielding a joint A−B interval of −30.00 to +36.43 in this fictional example.
+
+<img src="docs/screenshots/13-joint-rating-weight.png" width="520" alt="V3.0 combined score and weight intervals with four scores and four weights selected."> See [the derivation](docs/UNCERTAINTY_METHOD.md).
+
 ## V2.0 · Joint uncertainty workbench
 
-Step 8 adds an optional, collapsible deterministic interval analysis. **Select only the individual ratings you are genuinely unsure about**, then allow each of those ratings to vary by up to **±0.5, ±1, or ±2 points** (clipped to 0–10). Unselected ratings and all weights remain fixed. The engine calculates the **exact minimum and maximum A−B score difference** across all independent combinations of these ranges. You can inspect a concrete boundary scenario and apply it to your current scores with confirmation and Undo support.
+Step 8 adds an optional, collapsible deterministic interval analysis. **Select only the individual ratings you are genuinely unsure about**, then allow each of those ratings to vary by up to **±0.5, ±1, or ±2 points** (clipped to 0–10). Unselected ratings stay fixed; **if no weight is selected**, all weights stay fixed (V2 behavior). The engine calculates the **exact minimum and maximum A−B score difference** across all independent combinations of these ranges. You can inspect a concrete boundary scenario and apply it to your current scores with confirmation and Undo support.
 
 These ranges reflect subjective assumptions, not measured error distributions. **The result is not a probability, confidence level, or forecast**; potential correlations or uncertainty in the weights are outside this model. No selections means no robustness claim. See the [method and limitations](docs/UNCERTAINTY_METHOD.md).
 
@@ -134,7 +144,7 @@ Only **one in-memory baseline** is stored in the current tab; it disappears on r
 4. Read the "what would flip this" panel — how far a factor's weight share has to go before the two sides tie, and **which assumption is worth checking first**.
 5. Check whether a **single rating ±1 point** would change the result; the number of tested cases is not a probability.
 6. Undo/redo up to 30 edit steps within the current tab.
-7. Optionally use Step 8 to stress-test several uncertain ratings simultaneously.
+7. Optionally use Step 8 to stress-test several uncertain ratings and weights simultaneously.
 8. **Export to JSON** if you want to keep it. Refresh and it's gone; no record is kept.
 
 > **What it is not, in one sentence**: the scores come from ratings and weights **you** typed in. They are a weighted average — **not a success rate, not a forecast, not a measurement**. For high-stakes medical, legal, or financial decisions, talk to a qualified professional; this tool can only help you get the pieces straight.

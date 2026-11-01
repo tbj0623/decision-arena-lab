@@ -30,7 +30,7 @@ import { checkImportFile } from './import-guard.mjs';
 import { probeRatingSensitivity } from './features/rating-sensitivity.mjs';
 import { captureScenario, compareScenarios } from './features/scenario-compare.mjs';
 import { createEditorHistory } from './features/editor-history.mjs';
-import { analyzeSelectedUncertainty } from './features/uncertainty-workbench.mjs';
+import { analyzeJointUncertainty } from './features/joint-weight-rating.mjs';
 
 import { EXAMPLES, cloneBody, buildViewpoints, detectHighRisk, highRiskNotice } from './features/narrative.mjs';
 
@@ -128,6 +128,7 @@ let suspendHistory = false;
 let pendingHistoryGroup = null;
 /** 联合区间试算只保留当前页面的用户选择，不修改评分历史，不导出。 */
 const uncertainCells = new Set();
+const uncertainWeights = new Set();
 let uncertaintySignature = null;
 
 function uncertaintyKey(factorId, side) {
@@ -135,9 +136,12 @@ function uncertaintyKey(factorId, side) {
 }
 function clearUncertaintyPreferences() {
   uncertainCells.clear();
+  uncertainWeights.clear();
   uncertaintySignature = null;
   const radius = $('#uncertainty-radius');
   if (radius) radius.value = '1';
+  const weightRadius = $('#uncertainty-weight-radius');
+  if (weightRadius) weightRadius.value = '1';
   const status = $('#uncertainty-status');
   if (status) status.textContent = '';
 }
@@ -1599,7 +1603,7 @@ function renderUncertaintyControls(analysis) {
   if (!controls) return;
   const signature = JSON.stringify([
     analysis.options.map((o) => o.label),
-    analysis.factors.map((f) => [f.id, f.label, f.ratings.A, f.ratings.B]),
+    analysis.factors.map((f) => [f.id, f.label, f.weight, f.ratings.A, f.ratings.B]),
   ]);
   if (signature === uncertaintySignature) return;
 
@@ -1607,6 +1611,10 @@ function renderUncertaintyControls(analysis) {
     ['A', 'B'].map((side) => uncertaintyKey(f.id, side))));
   for (const key of uncertainCells) {
     if (!validKeys.has(key)) uncertainCells.delete(key);
+  }
+  const weightIds = new Set(analysis.factors.map((f) => f.id));
+  for (const id of uncertainWeights) {
+    if (!weightIds.has(id)) uncertainWeights.delete(id);
   }
   clear(controls);
   for (const factor of analysis.factors) {
@@ -1625,6 +1633,15 @@ function renderUncertaintyControls(analysis) {
       options.append(el('label', { class: 'uncertainty-check' }, input,
         el('span', { text: `${side}：${factor.ratings[side]} 分` })));
     }
+    const weightInput = el('input', {
+      type: 'checkbox',
+      'data-uncertainty-weight': 'true',
+      'data-factor-id': factor.id,
+      'aria-label': `「${factor.label}」的原始权重不确定`,
+    });
+    weightInput.checked = uncertainWeights.has(factor.id);
+    options.append(el('label', { class: 'uncertainty-check uncertainty-weight-check' },
+      weightInput, el('span', { text: `权重：${factor.weight}` })));
     controls.append(el('div', { class: 'uncertainty-factor' },
       el('strong', { text: factor.label }), options));
   }
@@ -1642,14 +1659,16 @@ function renderUncertaintyOutput(analysis) {
   }
 
   const selected = uncertaintySelected(analysis);
-  if (!selected.length) {
+  const weightSelected = analysis.factors.filter((f) => uncertainWeights.has(f.id)).map((f) => f.id);
+  if (!selected.length && !weightSelected.length) {
     target.append(el('p', { class: 'uncertainty-empty',
-      text: '尚未标记不确定评分。展开上方选项，勾选至少一格后才开始联合分析。' }));
+      text: '尚未标记不确定的评分或权重。展开上方选项，勾选至少一项后才开始联合分析。' }));
     return;
   }
 
   const radius = Number($('#uncertainty-radius')?.value || '1');
-  const report = analyzeSelectedUncertainty(state, selected, radius);
+  const weightRadius = Number($('#uncertainty-weight-radius')?.value || '1');
+  const report = analyzeJointUncertainty(state, selected, radius, weightSelected, weightRadius);
   const { interval } = report;
   const summary = report.status === 'always-A'
     ? '在这些设定范围内，方案 A 始终领先'
@@ -1662,7 +1681,9 @@ function renderUncertaintyOutput(analysis) {
   target.append(
     el('p', { class: 'uncertainty-verdict', text: summary, role: 'status', 'aria-live': 'polite' }),
     el('p', { class: 'uncertainty-meta',
-      text: `已标记 ${report.activeCount} 格评分，允许各自最多上下 ${report.radius} 分，并可同时变化。权重及其他评分保持原值。` }),
+      text: report.weightCount
+        ? `已标记 ${report.activeCount} 格评分（上下 ${report.radius} 分）和 ${report.weightCount} 项权重（原始值上下 ${report.weightRadius}）；所有选中项可独立同时变化，其余保持不变。权重占比按每组总权重重新计算。`
+        : `已标记 ${report.activeCount} 格评分，允许各自最多上下 ${report.radius} 分，并可同时变化。权重及其他评分保持原值。` }),
     el('p', { class: 'uncertainty-numbers',
       text: `A 减 B 的差值范围：${interval.minDelta.toFixed(2)} ～ ${interval.maxDelta.toFixed(2)} 分；当前差值 ${report.point.difference.toFixed(2)} 分。` }),
   );
@@ -1680,13 +1701,18 @@ function renderUncertaintyOutput(analysis) {
     bar));
 
   const worst = report.witness;
+  const weightChanges = worst.weightChanges || [];
   const examples = el('details', { class: 'uncertainty-example disclosure' },
-    el('summary', { text: `查看一组允许的边界组合（实际改变 ${worst.changes.length} 格）` }));
-  if (worst.changes.length) {
+    el('summary', { text: `查看一组允许的边界组合（改变 ${worst.changes.length} 格评分、${weightChanges.length} 项权重）` }));
+  if (worst.changes.length || weightChanges.length) {
     const changes = el('ul', { class: 'uncertainty-changes' });
     for (const change of worst.changes) {
       changes.append(el('li', { text:
-        `「${change.factorLabel}」方案 ${change.side}：${change.before} → ${change.after}` }));
+        `「${change.factorLabel}」方案 ${change.side} 评分：${change.before} → ${change.after}` }));
+    }
+    for (const change of weightChanges) {
+      changes.append(el('li', { text:
+        `「${change.factorLabel}」原始权重：${change.before} → ${change.after}` }));
     }
     examples.append(changes,
       el('p', { text: `这个组合重新按原公式计算后：A ${fmt1(worst.scoreA)} / B ${fmt1(worst.scoreB)}。` }),
@@ -1694,24 +1720,30 @@ function renderUncertaintyOutput(analysis) {
         type: 'button', class: 'btn btn-mini',
         'data-action': 'apply-uncertainty-witness',
         onclick: () => {
-          if (!confirm('将上述边界组合写入当前评分？原评分可使用「撤销」回退；未导出的其它编辑仍请谨慎保留。')) return;
+          if (!confirm(weightChanges.length
+            ? '将上述边界组合的评分与权重都写入当前决策？原始数据可以通过「撤销」恢复。'
+            : '将上述边界组合写入当前评分？原评分可使用「撤销」回退；未导出的其它编辑仍请谨慎保留。')) return;
           for (const f of state.factors) {
             for (const side of ['A','B']) {
               const change = worst.changes.find((c) => c.factorId === f.id && c.side === side);
               if (change) f.ratings[side] = change.after;
             }
+            const weightChange = weightChanges.find((c) => c.factorId === f.id);
+            if (weightChange) f.weight = weightChange.after;
           }
           renderFactorList();
           recalc();
           const status = $('#uncertainty-status');
-          if (status) status.textContent = '已应用边界组合；你可以点击下方「撤销」恢复原评分。';
+          if (status) status.textContent = weightChanges.length
+            ? '已应用边界评分与权重；可点击下方「撤销」恢复原始判断。'
+            : '已应用边界组合；你可以点击下方「撤销」恢复原评分。';
         },
-      }, '试用这组评分（可撤销）'));
+      }, weightChanges.length ? '试用这组评分与权重（可撤销）' : '试用这组评分（可撤销）'));
   } else {
     examples.append(el('p', { text: '该边界与当前评分相同，没有需要修改的单元格。' }));
   }
   target.append(examples, el('p', { class: 'caveat',
-    text: '此结论只覆盖你勾选的评分、所选上下界及“各自独立变化”的假设；没有覆盖权重变化、未勾选因素或现实世界的未知风险。范围宽窄不是概率，不代表某种结果更容易发生。' }));
+    text: `此结论仅覆盖所勾选的 ${report.activeCount} 格评分、${report.weightCount} 项权重及所选上下界；各项按独立区间组合，分母为零的权重组合被排除。未勾选项、现实变量相关性及范围外风险不在分析内。结果不是发生概率或客观可靠性。` }));
 }
 
 function renderUncertainty(analysis) {
@@ -1721,16 +1753,25 @@ function renderUncertainty(analysis) {
 
 function bindUncertaintyActions() {
   $('#uncertainty-controls')?.addEventListener('change', (event) => {
-    const input = event.target.closest('input[data-uncertainty-cell]');
+    const input = event.target.closest('input[data-uncertainty-cell], input[data-uncertainty-weight]');
     if (!input) return;
-    const key = uncertaintyKey(input.dataset.factorId, input.dataset.side);
-    if (input.checked) uncertainCells.add(key);
-    else uncertainCells.delete(key);
+    if (input.dataset.uncertaintyWeight === 'true') {
+      const id = input.dataset.factorId;
+      if (input.checked) uncertainWeights.add(id);
+      else uncertainWeights.delete(id);
+    } else {
+      const key = uncertaintyKey(input.dataset.factorId, input.dataset.side);
+      if (input.checked) uncertainCells.add(key);
+      else uncertainCells.delete(key);
+    }
     renderUncertaintyOutput(lastAnalysis);
     const status = $('#uncertainty-status');
     if (status) status.textContent = '';
   });
   $('#uncertainty-radius')?.addEventListener('change', () => {
+    renderUncertaintyOutput(lastAnalysis);
+  });
+  $('#uncertainty-weight-radius')?.addEventListener('change', () => {
     renderUncertaintyOutput(lastAnalysis);
   });
 }

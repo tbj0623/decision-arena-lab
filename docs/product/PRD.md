@@ -81,6 +81,7 @@
 
 | 功能 | 状态 | 说明 |
 |---|---|---|
+| **联合评分＋权重区间（V3.0）** | ✅ **已启用** | 原 V2.0 区间只覆盖多个评分同时变化；V3.0 新增独立的权重范围，统一使用归一化权重，在最多 64 个有效权重角点上求联合差值最值。见 `site/features/joint-weight-rating.mjs` 和 `docs/UNCERTAINTY_METHOD.md`。 |
 | **联合区间敏感性分析（V2.0）** | ✅ **已启用可选工作台** | 原有 `site/features/interval.mjs` 闭式解经 `site/features/uncertainty-workbench.mjs` 接入第八步；用户只需勾选不确定单元格并指定 ±0.5/1/2 分，不需要输入十多个区间端点。固定权重、独立区间联合端点；无概率。旧版 `ops/product/INTERVAL_DECISION.md` 属当时不接 UI 的历史决策，被本版取代。 |
 
 ### 坚决不做

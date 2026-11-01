@@ -394,6 +394,55 @@
       },
       "note": "真实 Chromium 截图（1440x960, DPR2）；不采用 AI 概念图；虚构职业示例。",
       "ok": true
+    },
+    {
+      "file": "docs/screenshots/13-joint-rating-weight.png",
+      "name": "joint-rating-weight-four-and-four",
+      "viewport": "1440×960",
+      "dpr": 2,
+      "theme": "light",
+      "browser": "Chromium 151.0.7922.34",
+      "commit": "cc1f76cc6bccbde95e878fe5ca3e3178e36929f4",
+      "example": "offer",
+      "inputs": {
+        "ratingSides": [
+          {
+            "factorId": "f1",
+            "side": "A"
+          },
+          {
+            "factorId": "f2",
+            "side": "A"
+          },
+          {
+            "factorId": "f3",
+            "side": "A"
+          },
+          {
+            "factorId": "f4",
+            "side": "A"
+          }
+        ],
+        "ratingRadius": 2,
+        "weightFactors": [
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "weightRadius": 2
+      },
+      "selfCheck": {
+        "kind": "joint-rating-weight",
+        "selectedRatings": 4,
+        "selectedWeights": 4,
+        "status": "both-possible",
+        "minDeltaApprox": -30.0,
+        "maxDeltaApprox": 36.43,
+        "originalDeltaApprox": 7.14
+      },
+      "note": "真实 Chromium 截图，来自 V3.0 原代码的虚构职业选择示例；非 AI 概念图。",
+      "ok": true
     }
   ]
 }
