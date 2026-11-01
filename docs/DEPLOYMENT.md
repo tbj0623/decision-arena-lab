@@ -28,21 +28,16 @@ node scripts/serve.mjs 3000     # 指定端口
 3. 推送到 `main` 分支，或在 Actions 页手动触发 `Deploy to GitHub Pages`
 4. 等 workflow 变绿，站点地址是 `https://<owner>.github.io/<repo>/`
 
-workflow 会**先跑测试**，测试不过就不会部署：
+workflow 会**先跑测试**，测试不过就不会部署。PR 只测试和构建，不执行部署；合并到 `main` 后重新验证并部署。测试包含独立安装的 Playwright Chromium（CI 缺失时不得跳过）：
 
 ```yaml
 - run: node --test                      # 不要写成 node --test tests/（Node 24 会把目录当模块）
 - run: node scripts/check-no-network.mjs
 ```
 
-需要的权限已经写在 workflow 里：
+维护说明（2026-11）：官方 Actions 组件升级至 `checkout@v7`、`setup-node@v7`、`upload-pages-artifact@v5` 和 `deploy-pages@v5`，均适配 Node 24；`setup-node` 不启用自动包管理器缓存。上传时仅允许 `.nojekyll` 这一隐藏路径，避免意外公开其他隐藏文件。
 
-```yaml
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-```
+权限实行最小授权：workflow 默认仅 `contents: read`，只有 deploy job 额外授予 `pages: write` 与 `id-token: write`，PR 不获得部署写权限。
 
 ### 方式二：从分支部署
 
