@@ -62,6 +62,10 @@ and never calls it an exact tie:
 
 ![Results area](docs/screenshots/04-desktop-result-flip.png)
 
+**New: one-rating ±1 stress test** (real Chromium screenshot using the fictional offer example, with rating A for “growth speed” adjusted to 7 to reach a tie):
+
+![One-rating stress test: small changes in subjective scores can change the lead](docs/screenshots/10-rating-sensitivity.png)
+
 **Nine fictional examples** (career, purchases, housing, education, letting go, relationships, everyday life):
 
 ![Nine fictional examples](docs/screenshots/09-nine-examples.png)

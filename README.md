@@ -55,6 +55,10 @@
 
 ![结果区](docs/screenshots/04-desktop-result-flip.png)
 
+**新功能：单项评分 ±1 分压力测试**（真实浏览器截图；使用虚构的 offer 示例，把「成长速度」A 评分改成 7，使两边处于打平状态）：
+
+![评分压力测试：改变一项主观评分就可能改变倾向](docs/screenshots/10-rating-sensitivity.png)
+
 **九个虚构示例**（覆盖职业 / 消费 / 居住 / 升学 / 断舍离 / 关系 / 生活）：
 
 ![九个虚构示例](docs/screenshots/09-nine-examples.png)

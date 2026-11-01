@@ -303,6 +303,31 @@
         "allNineRendered": true
       },
       "ok": true
+    },
+    {
+      "file": "docs/screenshots/10-rating-sensitivity.png",
+      "name": "rating-sensitivity-near-tie",
+      "viewport": "1440×960",
+      "dpr": 2,
+      "theme": "light",
+      "browser": "Chromium 151.0.7922.34",
+      "commit": "b8d6866e0807b5ffe71bd5f6a3f8841268c81e28",
+      "example": "offer",
+      "inputs": {
+        "factorId": "f1",
+        "option": "A",
+        "rating": 7
+      },
+      "selfCheck": {
+        "kind": "rating-sensitivity",
+        "headingVisible": true,
+        "baseStatus": "tie",
+        "tested": 16,
+        "changedCount": 16,
+        "hasFocusActions": true
+      },
+      "note": "真实浏览器截取新结果卡；不修改旧有 9 张截图的历史拍摄 commit。",
+      "ok": true
     }
   ]
 }
