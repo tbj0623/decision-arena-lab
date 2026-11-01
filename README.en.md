@@ -62,6 +62,10 @@ and never calls it an exact tie:
 
 ![Results area](docs/screenshots/04-desktop-result-flip.png)
 
+**New: compare a saved baseline against your current edits** (real Chromium screenshot with one fictional score modified):
+
+![Baseline scenario and current what-if result side by side](docs/screenshots/11-scenario-baseline.png)
+
 **New: one-rating ±1 stress test** (real Chromium screenshot using the fictional offer example, with rating A for “growth speed” adjusted to 7 to reach a tie):
 
 ![One-rating stress test: small changes in subjective scores can change the lead](docs/screenshots/10-rating-sensitivity.png)

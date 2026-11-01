@@ -55,6 +55,10 @@
 
 ![结果区](docs/screenshots/04-desktop-result-flip.png)
 
+**新增：基准情景与当前尝试并排对比**（真实 Chromium 截图，虚构示例中将 A 的一项评分改为 0）：
+
+![基准情景对比，查看两份主观评分的差别](docs/screenshots/11-scenario-baseline.png)
+
 **新功能：单项评分 ±1 分压力测试**（真实浏览器截图；使用虚构的 offer 示例，把「成长速度」A 评分改成 7，使两边处于打平状态）：
 
 ![评分压力测试：改变一项主观评分就可能改变倾向](docs/screenshots/10-rating-sensitivity.png)
