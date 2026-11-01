@@ -21,12 +21,15 @@ jobs:
     name: Test before deploy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
+          package-manager-cache: false
 
       - name: Install pinned Playwright and Chromium for browser regression
         # Playwright 只用于 CI / 测试，不进入网站运行时依赖。
@@ -48,7 +51,9 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Stage site directory
         run: |
@@ -56,11 +61,19 @@ jobs:
           cp -r site/. _site/
           # 让 GitHub Pages 跳过 Jekyll 处理，避免下划线开头的文件被忽略
           touch _site/.nojekyll
+          # v5 允许保留 .nojekyll，但不得意外公开其他隐藏文件/目录。
+          unexpected_hidden="$(find _site -mindepth 1 -name '.*' ! -name '.nojekyll' -print -quit)"
+          if [ -n "$unexpected_hidden" ]; then
+            echo "::error::Unexpected hidden site path: $unexpected_hidden"
+            exit 1
+          fi
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: _site
+          # v5 默认不上传隐藏文件；保留 .nojekyll 以避免 Jekyll 处理。
+          include-hidden-files: true
 
   deploy:
     if: github.event_name != 'pull_request'
@@ -76,4 +89,4 @@ jobs:
     steps:
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
