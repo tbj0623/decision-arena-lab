@@ -3250,3 +3250,44 @@ main:focus:not(:focus-visible) {
 
 .sensitivity-action { margin-top: .5rem; }
 .sensitivity-list .sensitivity-action { margin-top: .55rem; }
+
+/* V1.4 · 基准对比，只有用户主动保存的一份临时情景。 */
+.card-scenario { border-inline-start: 3px solid var(--brand); }
+.scenario-actions { display: flex; flex-wrap: wrap; gap: .55rem; margin-bottom: 1rem; }
+.scenario-actions .btn { min-height: var(--tap); }
+.scenario-rows { display: grid; gap: .55rem; margin: .35rem 0 .75rem; }
+.scenario-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  flex-wrap: wrap; gap: .35rem .75rem;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: .7rem .85rem; background: var(--bg-sunk);
+}
+.scenario-row strong { color: var(--ink); }
+.scenario-row span { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.scenario-delta { margin: .7rem 0 .35rem; color: var(--ink-2); }
+.scenario-lead { color: var(--ink); font-weight: 700; }
+.scenario-status { color: var(--accent); min-height: 1.5em; font-size: var(--fs-sm); }
+.card-scenario .caveat { color: var(--ink-2); font-size: var(--fs-sm); }
+@media print {
+  .scenario-actions, .scenario-status { display: none !important; }
+  .card-scenario { box-shadow: none; }
+  .scenario-row { background: transparent; }
+}
+@media (forced-colors: active) {
+  .card-scenario { border-inline-start-color: CanvasText; }
+  .scenario-row { background: Canvas; border-color: CanvasText; }
+  .scenario-status { color: CanvasText; }
+}
+
+.scenario-warning {
+  margin: .6rem 0;
+  padding: .65rem .75rem;
+  border-inline-start: 3px solid var(--warn);
+  border-radius: var(--radius-xs);
+  color: var(--ink);
+  background: var(--warn-soft);
+  font-size: var(--fs-sm);
+}
+@media (forced-colors: active) {
+  .scenario-warning { background: Canvas; color: CanvasText; border-inline-start-color: CanvasText; }
+}

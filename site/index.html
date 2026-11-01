@@ -305,6 +305,23 @@
             <p class="result-empty">有了分析结果后，这里会检查评分微调是否改变结论。</p>
           </div>
         </section>
+
+        <section class="card card-scenario" id="scenario-card" aria-labelledby="scenario-title">
+          <div class="card-head">
+            <h3 id="scenario-title"><span class="step-num" aria-hidden="true">7</span> 比较两种想法</h3>
+          </div>
+          <p class="card-note">先把当前判断存为基准，再自由调整评分或权重，看看和原先相比有什么变化。</p>
+          <div class="scenario-actions" role="group" aria-label="基准情景操作">
+            <button type="button" class="btn btn-mini" id="scenario-save">保存当前为基准</button>
+            <button type="button" class="btn btn-mini" id="scenario-restore" disabled>恢复基准</button>
+            <button type="button" class="btn btn-mini" id="scenario-clear" disabled>丢弃基准</button>
+          </div>
+          <div id="scenario-body">
+            <p class="result-empty">还没有保存基准；这是可选的本地对比功能。</p>
+          </div>
+          <p id="scenario-status" class="scenario-status" role="status" aria-live="polite"></p>
+          <p class="card-note subtle">只在当前标签页内存中保留一份基准；刷新、切换示例、成功导入或清空都会丢弃。导出 JSON 和分享摘要仅包含当前决策，不包含基准。</p>
+        </section>
       </div>
     </div>
 
