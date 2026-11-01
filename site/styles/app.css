@@ -3300,7 +3300,7 @@ main:focus:not(:focus-visible) {
 .card-uncertainty { border-inline-start: 3px solid var(--accent); }
 .uncertainty-config { margin-top: .85rem; }
 .uncertainty-config > label { display: block; font-weight: 650; margin: .5rem 0; }
-#uncertainty-radius {
+#uncertainty-radius, #uncertainty-weight-radius {
   max-width: 100%;
   min-height: var(--tap);
   padding: .5rem .8rem;

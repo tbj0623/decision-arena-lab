@@ -54,7 +54,8 @@ test('联合区间：逐格勾选、切换幅度、生成边界、确认应用�
     assert.equal(await page.locator('#uncertainty-details').getAttribute('open'),null,
       'complex controls must be initially collapsed');
     await page.locator('#uncertainty-details summary').first().click();
-    assert.equal(await page.locator('#uncertainty-controls input[type="checkbox"]').count(),8);
+    assert.equal(await page.locator('#uncertainty-controls input[data-uncertainty-cell]').count(),8);
+    assert.equal(await page.locator('#uncertainty-controls input[data-uncertainty-weight]').count(),4);
 
     for(const input of await page.locator('#uncertainty-controls input[data-side="A"]').all()){
       await input.check();
