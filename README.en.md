@@ -110,6 +110,10 @@ Step 8 adds an optional, collapsible deterministic interval analysis. **Select o
 
 These ranges reflect subjective assumptions, not measured error distributions. **The result is not a probability, confidence level, or forecast**; potential correlations or uncertainty in the weights are outside this model. No selections means no robustness claim. See the [method and limitations](docs/UNCERTAINTY_METHOD.md).
 
+Real Chromium screenshot with a fictional career-offer example (four A scores allowed to vary independently by ±2 points):
+
+<img src="docs/screenshots/12-joint-uncertainty.png" width="520" alt="Joint uncertainty workbench showing four selected ratings, a score difference interval crossing zero, and a deterministic boundary example.">
+
 ## Undo and redo: experiment safely
 
 The toolbar has **Undo** and **Redo** buttons. You can undo confirmed rating/weight edits, factor changes, equal weights, the tipping-point jump, and baseline restoration. The current tab keeps up to **30 steps**; rapid changes to the same slider or input are grouped. A new edit after undo discards the old redo path.

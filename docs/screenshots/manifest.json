@@ -353,6 +353,47 @@
       },
       "note": "真实浏览器从源代码对应的交互卡截图；仅使用虚构示例。",
       "ok": true
+    },
+    {
+      "file": "docs/screenshots/12-joint-uncertainty.png",
+      "name": "joint-uncertainty-four-ratings",
+      "viewport": "1440×960",
+      "dpr": 2,
+      "theme": "light",
+      "browser": "Chromium 151.0.7922.34",
+      "commit": "61d371bb23c85d8b99422bd834a19999cc5fd2ee",
+      "example": "offer",
+      "inputs": {
+        "selected": [
+          {
+            "factorId": "f1",
+            "side": "A"
+          },
+          {
+            "factorId": "f2",
+            "side": "A"
+          },
+          {
+            "factorId": "f3",
+            "side": "A"
+          },
+          {
+            "factorId": "f4",
+            "side": "A"
+          }
+        ],
+        "radius": 2
+      },
+      "selfCheck": {
+        "kind": "joint-uncertainty",
+        "activeCount": 4,
+        "status": "both-possible",
+        "minDeltaApprox": -12.86,
+        "maxDeltaApprox": 23.57,
+        "baselineDeltaApprox": 7.14
+      },
+      "note": "真实 Chromium 截图（1440x960, DPR2）；不采用 AI 概念图；虚构职业示例。",
+      "ok": true
     }
   ]
 }
