@@ -87,11 +87,13 @@ Decision Arena does one narrow thing:
 It makes **no recommendation** and computes **no success rate**. It answers one question, and it's
 the one that's more worth asking.
 
-## The three core experiences
+## Core experiences
 
 | 🧩 Lay it out side by side | 🎯 Find the tipping point | 🔍 Check it first |
 |---|---|---|
 | Score two options across 4–6 factors, set the weights, and watch the weighted result and each factor's contribution update live | See how far one factor's share of the weight has to move before the two sides tie, or even reverse; when it can't happen, it says so plainly instead of inventing a number | Start from the subjective assumption that moves the result most, and leave with one small check you can finish within a week |
+
+**New: one-rating stress test.** The tool now checks whether changing just **one** subjective rating by **+1 or −1 point** could change the lead, without changing weights or any other ratings. This is a bounded what-if calculation, **not a probability or forecast**.
 
 
 ## How to use it
@@ -100,7 +102,8 @@ the one that's more worth asking.
 2. List the **4–6 factors** you care about, rate A and B from **0 to 10**, then set a **non-negative weight** for each (you can set 0, meaning "setting this aside for now").
 3. Read the two 0–100 scores, the gap between them, and the **per-factor breakdown**.
 4. Read the "what would flip this" panel — how far a factor's weight share has to go before the two sides tie, and **which assumption is worth checking first**.
-5. **Export to JSON** if you want to keep it. Refresh and it's gone; no record is kept.
+5. Check whether a **single rating ±1 point** would change the result; the number of tested cases is not a probability.
+6. **Export to JSON** if you want to keep it. Refresh and it's gone; no record is kept.
 
 > **What it is not, in one sentence**: the scores come from ratings and weights **you** typed in. They are a weighted average — **not a success rate, not a forecast, not a measurement**. For high-stakes medical, legal, or financial decisions, talk to a qualified professional; this tool can only help you get the pieces straight.
 

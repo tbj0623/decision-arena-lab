@@ -248,3 +248,66 @@ test('UI 导入：超出 1 MiB 在创建 FileReader 前拒绝，正常 JSON 仍�
     await browser.close();
   }
 });
+
+
+test('评分微调压力测试：载入、评分变更和清空都与页面保持同步', async (t) => {
+  let chromium;
+  try {
+    ({ chromium } = await import(await resolvePlaywrightEntry()));
+  } catch (error) {
+    if (process.env.CI) {
+      throw new Error('CI 未安装 Playwright，不能跳过评分敏感性浏览器测试', { cause: error });
+    }
+    t.skip('本地没有安装 Playwright');
+    return;
+  }
+
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto(baseUrl, { waitUntil: 'networkidle' });
+    const box = page.locator('#sensitivity-body');
+    assert.match(await box.innerText(), /有了有效结果后/);
+
+    await page.locator('[data-action="demo-run"]').first().click();
+    await page.waitForFunction(() => document.querySelector('#sensitivity-body .sensitivity-headline'));
+    const first = await box.innerText();
+    assert.match(first, /枚举了 \d+ 种有效的单项评分调整/);
+    assert.match(first, /不是发生概率/);
+    assert.doesNotMatch(first, /NaN|undefined/);
+
+    // 每个情景可一键定位到真正的评分输入框，但不会偷偷修改数据。
+    await page.locator('#sensitivity-body .sensitivity-action').first().click();
+    // 等待首屏“演示”旧版延迟焦点回调到期，确保它不会抢走用户的新焦点。
+    await page.waitForTimeout(520);
+    const focused = await page.evaluate(() => document.activeElement?.id);
+    assert.match(focused, /^r-f\d-[AB]$/);
+    assert.equal(await box.innerText(), first, '仅定位评分输入框不能擅自改变结果');
+
+    // 改动用户真实评分输入，必须触发整条计算 → UI 更新链。
+    // 数字评分只在 change / 失焦时确认提交，不能误把输入中间态当最终评分。
+    await page.locator('#r-f1-A').fill('0');
+    await page.locator('#r-f1-A').press('Tab');
+    await page.waitForTimeout(180);
+    const next = await box.innerText();
+    assert.notEqual(next, first, '改变评分后，压力测试必须跟着刷新');
+    assert.doesNotMatch(next, /NaN|undefined/);
+
+    // 分享只包含汇总发现，不得把用户具体方案名偷偷带到新段落。
+    await page.locator('.toolbar [data-action="share"]').click();
+    const summary = await page.locator('#share-text').inputValue();
+    assert.match(summary, /评分压力测试/);
+    assert.match(summary, /不是发生概率/);
+    assert.doesNotMatch(summary, /去那家刚起步的小团队|留在现在的岗位/);
+    await page.locator('#share-dialog [data-action="close-share"]').click();
+
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.locator('.toolbar [data-action="reset"]').click();
+    assert.match(await box.innerText(), /有了有效结果后/);
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});
