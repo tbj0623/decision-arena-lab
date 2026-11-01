@@ -35,7 +35,7 @@ workflow 会**先跑测试**，测试不过就不会部署。PR 只测试和构�
 - run: node scripts/check-no-network.mjs
 ```
 
-维护说明（2026-11）：官方 Actions 组件升级至 `checkout@v7`、`setup-node@v7`、`upload-pages-artifact@v5` 和 `deploy-pages@v5`，均适配 Node 24；`setup-node` 不启用自动包管理器缓存。上传时仅允许 `.nojekyll` 这一隐藏路径，避免意外公开其他隐藏文件。
+维护说明（2026-11）：官方 Actions 组件升级至 `checkout@v7`、`setup-node@v7`、`upload-pages-artifact@v5` 和 `deploy-pages@v5`，均适配 Node 24；`setup-node` 不启用自动包管理器缓存。三个 job 使用明确的 `ubuntu-24.04`，避免 `ubuntu-latest` 在 2026 年 10–11 月迁移 Ubuntu 26.04 期间引入环境漂移；未来经过专门测试后再升级系统镜像。上传时仅允许 `.nojekyll` 这一隐藏路径，避免意外公开其他隐藏文件。
 
 权限实行最小授权：workflow 默认仅 `contents: read`，只有 deploy job 额外授予 `pages: write` 与 `id-token: write`，PR 不获得部署写权限。
 
