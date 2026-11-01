@@ -108,7 +108,11 @@ the one that's more worth asking.
 
 Step 8 now accepts **both uncertain scores and uncertain raw weights**. Select individual score cells (±0.5, ±1, ±2 points) and/or factor weights (a separate ±0.5, ±1, ±2 original weight units). Unselected inputs remain fixed. The engine computes **exact joint bounds** for A−B while *renormalizing the changed weights*. Inspect a feasible extreme scoring/weighting scenario, optionally apply it with confirmation, then Undo to restore the original values.
 
-A zero-sum weight configuration has no valid weighted average and is excluded. With no uncertain weights, all V2.0 behavior remains unchanged. These are **assumption-bounded deterministic results**, never probabilities or forecasts, and depend on independent-range assumptions. See [the derivation](docs/UNCERTAINTY_METHOD.md).
+A zero-sum weight configuration has no valid weighted average and is excluded. With no uncertain weights, all V2.0 behavior remains unchanged. These are **assumption-bounded deterministic results**, never probabilities or forecasts, and depend on independent-range assumptions.
+
+**Real Chromium screenshot:** four A ratings and four raw weights each vary by up to ±2 units, yielding a joint A−B interval of −30.00 to +36.43 in this fictional example.
+
+<img src="docs/screenshots/13-joint-rating-weight.png" width="520" alt="V3.0 combined score and weight intervals with four scores and four weights selected."> See [the derivation](docs/UNCERTAINTY_METHOD.md).
 
 ## V2.0 · Joint uncertainty workbench
 

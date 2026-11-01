@@ -1720,7 +1720,9 @@ function renderUncertaintyOutput(analysis) {
         type: 'button', class: 'btn btn-mini',
         'data-action': 'apply-uncertainty-witness',
         onclick: () => {
-          if (!confirm('将上述边界组合写入当前评分？原评分可使用「撤销」回退；未导出的其它编辑仍请谨慎保留。')) return;
+          if (!confirm(weightChanges.length
+            ? '将上述边界组合的评分与权重都写入当前决策？原始数据可以通过「撤销」恢复。'
+            : '将上述边界组合写入当前评分？原评分可使用「撤销」回退；未导出的其它编辑仍请谨慎保留。')) return;
           for (const f of state.factors) {
             for (const side of ['A','B']) {
               const change = worst.changes.find((c) => c.factorId === f.id && c.side === side);
@@ -1732,9 +1734,11 @@ function renderUncertaintyOutput(analysis) {
           renderFactorList();
           recalc();
           const status = $('#uncertainty-status');
-          if (status) status.textContent = '已应用边界组合；你可以点击下方「撤销」恢复原评分。';
+          if (status) status.textContent = weightChanges.length
+            ? '已应用边界评分与权重；可点击下方「撤销」恢复原始判断。'
+            : '已应用边界组合；你可以点击下方「撤销」恢复原评分。';
         },
-      }, '试用这组评分（可撤销）'));
+      }, weightChanges.length ? '试用这组评分与权重（可撤销）' : '试用这组评分（可撤销）'));
   } else {
     examples.append(el('p', { text: '该边界与当前评分相同，没有需要修改的单元格。' }));
   }
