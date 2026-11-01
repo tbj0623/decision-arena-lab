@@ -28,6 +28,7 @@ import {
 
 import { checkImportFile } from './import-guard.mjs';
 import { probeRatingSensitivity } from './features/rating-sensitivity.mjs';
+import { captureScenario, compareScenarios } from './features/scenario-compare.mjs';
 
 import { EXAMPLES, cloneBody, buildViewpoints, detectHighRisk, highRiskNotice } from './features/narrative.mjs';
 
@@ -117,6 +118,8 @@ let lastHypothesis = null;
 let lastDialogTrigger = null;
 /** 高风险命中结果：{risky, area, matched} 或 null */
 let lastHighRisk = null;
+/** 仅内存中由用户主动保存的一份基准情景。 */
+let savedScenario = null;
 
 /* ───────────── 示例卡 ───────────── */
 
@@ -156,8 +159,10 @@ function renderExamples() {
 function loadExample(key) {
   const ex = EXAMPLES.find((e) => e.key === key);
   if (!ex) return;
+  savedScenario = null;
   state = cloneBody(ex.body);
   renderAll();
+  setScenarioStatus('已切换示例，旧基准已丢弃。');
   const ws = $('#workspace');
   if (ws) ws.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
 }
@@ -529,6 +534,7 @@ function recalc() {
     renderFlipEmpty();
     renderVerifyEmpty();
     renderSensitivityEmpty();
+    renderScenario(null);
     lastAnalysis = null;
     lastFlip = null;
     lastHypothesis = null;
@@ -557,6 +563,7 @@ function recalc() {
     renderFlipEmpty();
     renderVerifyEmpty();
     renderSensitivityEmpty();
+    renderScenario(null);
     lastAnalysis = null;
     return;
   }
@@ -571,6 +578,7 @@ function recalc() {
     if (error instanceof ValidationError) {
       showFieldError('#factors-error', error.message);
       if (resultBody) resultBody.hidden = true;
+      renderScenario(null);
       return;
     }
     throw error;
@@ -593,6 +601,7 @@ function recalc() {
   renderFlip(analysis, thresholds, flip);
   renderVerify(hypothesis);
   renderSensitivity(analysis);
+  renderScenario(analysis);
   updateClosenessPill(analysis);
 }
 
@@ -1399,6 +1408,104 @@ function renderSensitivity(analysis) {
     text: '只做确定性压力测试：每次只改一项 0–10 分评分的 ±1 分，不调整权重，也不同时改多项。这里的“几种”只是枚举的情景数，不是发生概率、可靠性百分比或客观预测。得分计算使用完整精度，屏幕分数可能因取整显示相同。' }));
 }
 
+/* ───────────── 单基准情景：明确保存、内存比较、可恢复 ───────────── */
+
+function setScenarioStatus(message) {
+  const status = $('#scenario-status');
+  if (status) status.textContent = message;
+}
+
+function renderScenario(analysis) {
+  const body = $('#scenario-body');
+  const saveBtn = $('#scenario-save');
+  const restoreBtn = $('#scenario-restore');
+  const clearBtn = $('#scenario-clear');
+  if (!body) return;
+
+  if (saveBtn) saveBtn.disabled = !analysis;
+  if (restoreBtn) restoreBtn.disabled = !savedScenario;
+  if (clearBtn) clearBtn.disabled = !savedScenario;
+  clear(body);
+  if (!savedScenario) {
+    body.append(el('p', { class: 'result-empty',
+      text: '尚未保存基准。先填写并计算结果，再点「保存当前为基准」，之后修改任意评分或权重即可比较。' }));
+    return;
+  }
+  if (!analysis) {
+    body.append(el('p', { class: 'result-empty',
+      text: '基准仍在内存中。当前输入不完整或无效，暂时不能比较；你可以修正输入或恢复基准。' }));
+    return;
+  }
+
+  const comparison = compareScenarios(savedScenario, state);
+  const { before, after } = comparison;
+  const rows = el('div', { class: 'scenario-rows' });
+  rows.append(
+    el('div', { class: 'scenario-row' },
+      el('strong', { text: '已保存的基准' }),
+      el('span', { text: `A ${fmt1(before.scoreA)} · B ${fmt1(before.scoreB)}` })),
+    el('div', { class: 'scenario-row' },
+      el('strong', { text: '正在尝试的版本' }),
+      el('span', { text: `A ${fmt1(after.scoreA)} · B ${fmt1(after.scoreB)}` })),
+  );
+  body.append(rows);
+  const changes = comparison.changedFields;
+  const stateText = !changes
+    ? '当前和基准内容相同，尚未修改。'
+    : `相较基准有 ${changes} 处内容不同（含评分、权重、名称或因素结构）。`;
+  body.append(el('p', { class: 'scenario-delta', text: stateText }));
+  if (changes) {
+    const leadText = comparison.changedWinner
+      ? '当前计算的领先／打平状态与基准不同。'
+      : '当前计算的领先／打平状态与基准相同。';
+    body.append(el('p', { class: 'scenario-lead', text: leadText }));
+  }
+  if (comparison.optionNamesChanged) {
+    body.append(el('p', { class: 'scenario-warning',
+      text: '注意：方案名称已变化。如果名称代表的是另一项真实选择，不能直接把这份分数当作对原方案的改进；请重新保存基准。' }));
+  }
+  if (comparison.criteriaChanged) {
+    body.append(el('p', { class: 'scenario-warning',
+      text: '注意：因素集合或因素名称已改变，两份结果可能基于不同的评价标准；不能把差值单独归因于某个评分或权重。' }));
+  }
+  body.append(el('p', { class: 'caveat',
+    text: '显示分数保留 1 位小数；领先／打平状态按原始精度与数值容差判定，微小差别可能不会显示在数字上。对比的是两份主观假设，不是现实发生的概率。' }));
+}
+
+function bindScenarioActions() {
+  $('#scenario-save')?.addEventListener('click', () => {
+    // 输入中间态不应被误认为用户已经确认的评分。
+    if (document.querySelector('input[data-dirty="1"],input[data-pending="1"]')) {
+      setScenarioStatus('请先完成评分输入，按回车或离开输入框确认后再保存。');
+      return;
+    }
+    recalc();
+    if (!lastAnalysis) {
+      setScenarioStatus('请先填好并算出有效结果，才能保存基准。');
+      return;
+    }
+    if (savedScenario && !confirm('用当前判断覆盖之前保存的基准？旧基准将无法恢复。')) return;
+    savedScenario = captureScenario(state);
+    renderScenario(lastAnalysis);
+    setScenarioStatus('基准已保存到当前标签页的内存中。');
+  });
+
+  $('#scenario-restore')?.addEventListener('click', () => {
+    if (!savedScenario) return;
+    if (!confirm('恢复已保存的基准？当前未导出的修改会被覆盖，无法撤销。')) return;
+    state = captureScenario(savedScenario);
+    renderAll();
+    setScenarioStatus('已恢复基准。基准仍保留，你可以继续尝试不同修改。');
+  });
+
+  $('#scenario-clear')?.addEventListener('click', () => {
+    if (!savedScenario) return;
+    savedScenario = null;
+    renderScenario(lastAnalysis);
+    setScenarioStatus('已丢弃基准；当前编辑未受影响。');
+  });
+}
+
 /* ───────────── 全局渲染 ───────────── */
 
 function renderAll() {
@@ -1462,6 +1569,7 @@ function importJSON(file) {
         alert(`导入失败：${check.message}`);
         return;
       }
+      savedScenario = null;
       state = {
         title: typeof decision.title === 'string' ? decision.title : '',
         options: decision.options.map((o, i) => ({ id: i === 0 ? 'A' : 'B', label: String(o.label) })),
@@ -1473,6 +1581,7 @@ function importJSON(file) {
         })),
       };
       renderAll();
+      setScenarioStatus('已成功导入新决策，旧基准已丢弃。');
     } catch {
       alert('这个文件不是反悔雷达导出的 JSON，或者已经损坏。');
     }
@@ -1605,8 +1714,10 @@ function openShare() {
 
 function resetAll() {
   if (!confirm('清空当前所有输入？这个操作不能撤销，而且不会留下副本。')) return;
+  savedScenario = null;
   state = createEmptyDecision();
   renderAll();
+  setScenarioStatus('已清空输入与临时基准。');
   window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
 }
 
@@ -1974,6 +2085,7 @@ function bindEvents() {
 function boot() {
   renderExamples();
   bindEvents();
+  bindScenarioActions();
   renderAll();
   // 首屏真实交互示例要在示例数据渲染之后初始化（它要读 EXAMPLES）
   initHeroDemo();

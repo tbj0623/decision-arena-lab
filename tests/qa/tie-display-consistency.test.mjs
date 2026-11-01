@@ -311,3 +311,73 @@ test('评分微调压力测试：载入、评分变更和清空都与页面保�
     await browser.close();
   }
 });
+
+test('本地基准对比：显式保存、改分、取消恢复、确认恢复、失效恢复与重置', async (t) => {
+  let chromium;
+  try {
+    ({ chromium } = await import(await resolvePlaywrightEntry()));
+  } catch (error) {
+    if (process.env.CI) throw new Error('CI 必须安装 Chromium，不能跳过基准对比测试', { cause: error });
+    t.skip('本地环境没有 Playwright');
+    return;
+  }
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto(baseUrl, { waitUntil: 'networkidle' });
+
+    assert.equal(await page.locator('#scenario-save').isDisabled(), true);
+    assert.equal(await page.locator('#scenario-restore').isDisabled(), true);
+    await page.locator('[data-action="demo-run"]').first().click();
+    await page.waitForFunction(() => !document.querySelector('#scenario-save').disabled);
+    await page.locator('#scenario-save').click();
+    assert.match(await page.locator('#scenario-body').innerText(), /当前和基准内容相同/);
+    assert.equal(await page.locator('#scenario-restore').isDisabled(), false);
+
+    await page.locator('#r-f1-A').fill('0');
+    await page.locator('#r-f1-A').press('Tab');
+    await page.waitForFunction(() =>
+      document.querySelector('#scenario-body')?.textContent?.includes('领先／打平状态与基准不同'));
+    assert.match(await page.locator('#scenario-body').innerText(), /1 处内容不同/);
+
+    page.once('dialog', (dialog) => dialog.dismiss());
+    await page.locator('#scenario-restore').click();
+    assert.equal(await page.locator('#r-f1-A').inputValue(), '0', '取消恢复不能改动当前评分');
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.locator('#scenario-restore').click();
+    assert.equal(await page.locator('#r-f1-A').inputValue(), '9', '确认后应恢复保存时的评分');
+    assert.match(await page.locator('#scenario-body').innerText(), /当前和基准内容相同/);
+
+    await page.locator('#option-a').fill('');
+    await page.waitForFunction(() =>
+      document.querySelector('#scenario-body')?.textContent?.includes('当前输入不完整或无效'));
+    assert.equal(await page.locator('#scenario-restore').isDisabled(), false);
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.locator('#scenario-restore').click();
+    assert.equal(await page.locator('#option-a').inputValue(), '去那家刚起步的小团队');
+
+    await page.locator('#example-grid [data-example="rent"]').click();
+    assert.equal(await page.locator('#scenario-restore').isDisabled(), true,
+      '切换另一份示例必须忘记旧基准');
+
+    await page.locator('#scenario-save').click();
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.locator('.toolbar [data-action="reset"]').click();
+    assert.equal(await page.locator('#scenario-restore').isDisabled(), true);
+    assert.equal(await page.locator('#scenario-save').isDisabled(), true);
+    await page.reload({ waitUntil: 'networkidle' });
+    assert.equal(await page.locator('#scenario-restore').isDisabled(), true,
+      '刷新也不能保留临时基准');
+    const overflow = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    assert.ok(overflow.scrollWidth <= overflow.clientWidth + 2,
+      '窄屏不能因新增按钮产生横向溢出');
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});

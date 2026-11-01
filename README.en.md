@@ -62,6 +62,10 @@ and never calls it an exact tie:
 
 ![Results area](docs/screenshots/04-desktop-result-flip.png)
 
+**New: compare a saved baseline against your current edits** (real Chromium screenshot with one fictional score modified):
+
+![Baseline scenario and current what-if result side by side](docs/screenshots/11-scenario-baseline.png)
+
 **New: one-rating ±1 stress test** (real Chromium screenshot using the fictional offer example, with rating A for “growth speed” adjusted to 7 to reach a tie):
 
 ![One-rating stress test: small changes in subjective scores can change the lead](docs/screenshots/10-rating-sensitivity.png)
@@ -99,6 +103,12 @@ the one that's more worth asking.
 
 **New: one-rating stress test.** The tool now checks whether changing just **one** subjective rating by **+1 or −1 point** could change the lead, without changing weights or any other ratings. This is a bounded what-if calculation, **not a probability or forecast**.
 
+
+## Compare against a saved baseline
+
+After scoring a decision, click **Save current as baseline** in Step 7. Edit any rating, weight, factor or label to compare the current A/B scores against your snapshot. Restoring the baseline requires confirmation and overwrites unexported edits.
+
+Only **one in-memory baseline** is stored in the current tab; it disappears on refresh, reset, a different example or a successful JSON import. Export and sharing contain the current decision **only**. These are comparisons between subjective assumptions, not probability or measured real-world reliability. The actual UI remains Chinese-only.
 
 ## How to use it
 

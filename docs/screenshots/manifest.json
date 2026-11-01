@@ -328,6 +328,31 @@
       },
       "note": "真实浏览器截取新结果卡；不修改旧有 9 张截图的历史拍摄 commit。",
       "ok": true
+    },
+    {
+      "file": "docs/screenshots/11-scenario-baseline.png",
+      "name": "scenario-baseline-compare",
+      "viewport": "1440×960",
+      "dpr": 2,
+      "theme": "light",
+      "browser": "Chromium 151.0.7922.34",
+      "commit": "3292d42f2602f55c0d786e647927189e193cc1b2",
+      "example": "offer",
+      "inputs": {
+        "factorId": "f1",
+        "ratingA": 0
+      },
+      "selfCheck": {
+        "kind": "scenario-compare",
+        "baselineA": "70.7",
+        "currentA": "38.6",
+        "baselineB": "63.6",
+        "currentB": "63.6",
+        "changedFields": 1,
+        "changedWinner": true
+      },
+      "note": "真实浏览器从源代码对应的交互卡截图；仅使用虚构示例。",
+      "ok": true
     }
   ]
 }
