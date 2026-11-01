@@ -27,6 +27,7 @@ import {
 } from './precision.mjs';
 
 import { checkImportFile } from './import-guard.mjs';
+import { probeRatingSensitivity } from './features/rating-sensitivity.mjs';
 
 import { EXAMPLES, cloneBody, buildViewpoints, detectHighRisk, highRiskNotice } from './features/narrative.mjs';
 
@@ -527,6 +528,7 @@ function recalc() {
     if (pill) pill.hidden = true;
     renderFlipEmpty();
     renderVerifyEmpty();
+    renderSensitivityEmpty();
     lastAnalysis = null;
     lastFlip = null;
     lastHypothesis = null;
@@ -554,6 +556,7 @@ function recalc() {
     if (pill) pill.hidden = true;
     renderFlipEmpty();
     renderVerifyEmpty();
+    renderSensitivityEmpty();
     lastAnalysis = null;
     return;
   }
@@ -589,6 +592,7 @@ function recalc() {
   renderContribTable(analysis);
   renderFlip(analysis, thresholds, flip);
   renderVerify(hypothesis);
+  renderSensitivity(analysis);
   updateClosenessPill(analysis);
 }
 
@@ -1320,6 +1324,81 @@ function renderVerify(hypothesis) {
   }
 }
 
+/* ───────────── 主观评分误差压力测试 ───────────── */
+
+function renderSensitivityEmpty() {
+  const target = $('#sensitivity-body');
+  if (!target) return;
+  clear(target);
+  target.append(el('p', { class: 'result-empty',
+    text: '有了有效结果后，这里会逐一检查单项评分微调 1 分是否改变结论。' }));
+}
+
+function focusSensitivityRating(factorId, side) {
+  // 只定位和聚焦，让用户自己确认分数；不能擅自改动其原始判断。
+  const input = document.getElementById(`r-${factorId}-${side}`);
+  if (!input) return;
+  input.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'center' });
+  input.focus({ preventScroll: true });
+}
+
+function renderSensitivity(analysis) {
+  const target = $('#sensitivity-body');
+  if (!target) return;
+  clear(target);
+
+  const report = probeRatingSensitivity(state);
+  const optionName = (winner) => winner === 'tie'
+    ? '打平'
+    : analysis.options.find((o) => o.id === winner)?.label || winner;
+  const affected = report.changedCount > 0;
+  const title = report.baseWinner === 'tie'
+    ? affected ? '当前处于打平状态，单项评分会改变倾向' : '当前打平，单项微调仍未改变结论'
+    : affected ? '结论对某些单项评分比较敏感'
+      : '逐项改动 1 分，当前领先方仍未改变';
+
+  target.append(
+    el('p', { class: 'sensitivity-headline', text: title }),
+    el('p', { class: 'sensitivity-meta',
+      text: `枚举了 ${report.tested} 种有效的单项评分调整；其中 ${report.changedCount} 种改变了计算结果的领先/打平状态。` }),
+  );
+
+  if (affected) {
+    target.append(el('p', { class: 'sensitivity-intro',
+      text: '例如，只修改下面这一项，其他评分和权重完全不动：' }));
+    const items = el('ul', { class: 'sensitivity-list' });
+    for (const c of report.changes) {
+      items.append(el('li', { class: 'sensitivity-item' },
+        el('strong', { text: c.factorLabel }),
+        el('span', { text: ` · ${c.optionLabel}：${c.before} → ${c.after}` }),
+        el('span', { class: 'sensitivity-outcome',
+          text: `结果变为：${optionName(c.winner)}` }),
+        el('button', {
+          type: 'button',
+          class: 'btn btn-mini sensitivity-action',
+          'aria-label': `去核对「${c.factorLabel}」对「${c.optionLabel}」的评分`,
+          onclick: () => focusSensitivityRating(c.factorId, c.side),
+        }, '去核对这项评分')));
+    }
+    target.append(items);
+  } else if (report.closest) {
+    const c = report.closest;
+    target.append(
+      el('p', { class: 'sensitivity-intro',
+        text: `最接近打平的一次单项调整：将「${c.factorLabel}」对「${c.optionLabel}」的评分由 ${c.before} 调到 ${c.after}，结论仍为「${optionName(c.winner)}」。` }),
+      el('button', {
+        type: 'button',
+        class: 'btn btn-mini sensitivity-action',
+        'aria-label': `去核对「${c.factorLabel}」对「${c.optionLabel}」的评分`,
+        onclick: () => focusSensitivityRating(c.factorId, c.side),
+      }, '去核对这项评分'),
+    );
+  }
+
+  target.append(el('p', { class: 'caveat',
+    text: '只做确定性压力测试：每次只改一项 0–10 分评分的 ±1 分，不调整权重，也不同时改多项。这里的“几种”只是枚举的情景数，不是发生概率、可靠性百分比或客观预测。得分计算使用完整精度，屏幕分数可能因取整显示相同。' }));
+}
+
 /* ───────────── 全局渲染 ───────────── */
 
 function renderAll() {
@@ -1473,6 +1552,13 @@ function buildShareText() {
     }
     lines.push(reasonText);
   }
+  lines.push('');
+  // 分享时只带「方向是否敏感」与检查规则，不暴露具体方案名或新增的原始评分。
+  const sensitivity = probeRatingSensitivity(state);
+  lines.push(sensitivity.changedCount > 0
+    ? '评分压力测试：仅改变任一单项主观评分 ±1 分，至少有一种情形会改变当前倾向。'
+    : '评分压力测试：逐一改动单项主观评分 ±1 分，未发现改变当前倾向的情形。');
+  lines.push('（这只是有限情形的计算检查，不是发生概率；同时改多项时结论可能不同。）');
   lines.push('');
   if (lastHypothesis) {
     lines.push(`我准备先去做的验证：${lastHypothesis.steps[0]}`);
@@ -1727,6 +1813,8 @@ function initHeroDemo() {
       // 让 tab 顺序从用户眼前的位置继续。
       // （ux-writer 建议）
       setTimeout(() => {
+        // 如果用户在动画期间已经点了其他控件，不可把焦点抢回标题。
+        if (document.activeElement !== btn && document.activeElement !== document.body) return;
         const heading = $('#workspace-title');
         if (heading) {
           heading.setAttribute('tabindex', '-1');

@@ -3188,3 +3188,65 @@ main:focus:not(:focus-visible) {
 }
 
 
+
+
+/* ─── V11 · 单项主观评分敏感性（跟随系统主题、打印与高对比） ─── */
+.card-sensitivity {
+  border-inline-start: 3px solid var(--accent);
+}
+.sensitivity-headline {
+  font-size: var(--fs-lg);
+  font-weight: 750;
+  color: var(--ink);
+  margin: 0 0 .4rem;
+}
+.sensitivity-meta {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  margin: 0 0 .8rem;
+}
+.sensitivity-intro {
+  font-size: var(--fs-md);
+  color: var(--ink-2);
+  margin: .6rem 0;
+}
+.sensitivity-list {
+  padding: 0;
+  margin: .7rem 0 1rem;
+  list-style: none;
+  display: grid;
+  gap: .55rem;
+}
+.sensitivity-item {
+  padding: .75rem .9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunk);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.sensitivity-item strong { color: var(--ink); }
+.sensitivity-outcome {
+  display: block;
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: .15rem;
+}
+.card-sensitivity .caveat {
+  margin: .85rem 0 0;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+}
+@media print {
+  .card-sensitivity { break-inside: avoid; box-shadow: none; }
+  .sensitivity-item { background: transparent; }
+}
+@media (forced-colors: active) {
+  .card-sensitivity { border-inline-start-color: CanvasText; }
+  .sensitivity-item { background: Canvas; border-color: CanvasText; }
+  .sensitivity-outcome { color: CanvasText; }
+}
+
+.sensitivity-action { margin-top: .5rem; }
+.sensitivity-list .sensitivity-action { margin-top: .55rem; }
