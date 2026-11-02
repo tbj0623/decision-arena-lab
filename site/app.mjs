@@ -142,6 +142,8 @@ function clearUncertaintyPreferences() {
   if (radius) radius.value = '1';
   const weightRadius = $('#uncertainty-weight-radius');
   if (weightRadius) weightRadius.value = '1';
+  const mode = $('#uncertainty-weight-mode');
+  if (mode) mode.value = 'independent';
   const status = $('#uncertainty-status');
   if (status) status.textContent = '';
 }
@@ -1668,8 +1670,10 @@ function renderUncertaintyOutput(analysis) {
 
   const radius = Number($('#uncertainty-radius')?.value || '1');
   const weightRadius = Number($('#uncertainty-weight-radius')?.value || '1');
-  const report = analyzeJointUncertainty(state, selected, radius, weightSelected, weightRadius);
+  const mode = $('#uncertainty-weight-mode')?.value || 'independent';
+  const report = analyzeJointUncertainty(state, selected, radius, weightSelected, weightRadius, mode);
   const { interval } = report;
+  const fixedTotal = report.mode === 'fixed-total';
   const summary = report.status === 'always-A'
     ? '在这些设定范围内，方案 A 始终领先'
     : report.status === 'always-B'
@@ -1682,8 +1686,10 @@ function renderUncertaintyOutput(analysis) {
     el('p', { class: 'uncertainty-verdict', text: summary, role: 'status', 'aria-live': 'polite' }),
     el('p', { class: 'uncertainty-meta',
       text: report.weightCount
-        ? `已标记 ${report.activeCount} 格评分（上下 ${report.radius} 分）和 ${report.weightCount} 项权重（原始值上下 ${report.weightRadius}）；所有选中项可独立同时变化，其余保持不变。权重占比按每组总权重重新计算。`
-        : `已标记 ${report.activeCount} 格评分，允许各自最多上下 ${report.radius} 分，并可同时变化。权重及其他评分保持原值。` }),
+        ? fixedTotal
+          ? `已标记 ${report.activeCount} 格评分（上下 ${report.radius} 分）和 ${report.weightCount} 项权重（上下 ${report.weightRadius}）；原始权重总和固定为 ${report.point.totalWeight}，只能在选中权重之间此消彼长。已核查 ${report.weightCornersEvaluated} 组可行顶点。`
+          : `已标记 ${report.activeCount} 格评分（上下 ${report.radius} 分）和 ${report.weightCount} 项权重（原始值上下 ${report.weightRadius}）；所有选中项可独立同时变化，其余保持不变。权重占比按每组总权重重新计算。`
+        : `已标记 ${report.activeCount} 格评分，允许各自最多上下 ${report.radius} 分，并可同时变化。权重保持原值；未勾权重时两种模式结果一致。` }),
     el('p', { class: 'uncertainty-numbers',
       text: `A 减 B 的差值范围：${interval.minDelta.toFixed(2)} ～ ${interval.maxDelta.toFixed(2)} 分；当前差值 ${report.point.difference.toFixed(2)} 分。` }),
   );
@@ -1740,10 +1746,10 @@ function renderUncertaintyOutput(analysis) {
         },
       }, weightChanges.length ? '试用这组评分与权重（可撤销）' : '试用这组评分（可撤销）'));
   } else {
-    examples.append(el('p', { text: '该边界与当前评分相同，没有需要修改的单元格。' }));
+    examples.append(el('p', { text: '该边界与当前评分及权重相同，没有需要修改的内容。' }));
   }
   target.append(examples, el('p', { class: 'caveat',
-    text: `此结论仅覆盖所勾选的 ${report.activeCount} 格评分、${report.weightCount} 项权重及所选上下界；各项按独立区间组合，分母为零的权重组合被排除。未勾选项、现实变量相关性及范围外风险不在分析内。结果不是发生概率或客观可靠性。` }));
+    text: `此结论仅覆盖 ${report.activeCount} 格评分、${report.weightCount} 项权重及所选区间；${fixedTotal ? '原始权重总和必须与当前相同，选中项会此消彼长' : '权重各自独立变化，合计为零的无效组合被排除'}。现实相关性、未选中的未知量与区间外风险未覆盖。结果不是发生概率或客观可靠性。` }));
 }
 
 function renderUncertainty(analysis) {
@@ -1772,6 +1778,9 @@ function bindUncertaintyActions() {
     renderUncertaintyOutput(lastAnalysis);
   });
   $('#uncertainty-weight-radius')?.addEventListener('change', () => {
+    renderUncertaintyOutput(lastAnalysis);
+  });
+  $('#uncertainty-weight-mode')?.addEventListener('change', () => {
     renderUncertaintyOutput(lastAnalysis);
   });
 }

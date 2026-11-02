@@ -104,6 +104,16 @@ the one that's more worth asking.
 **New: one-rating stress test.** The tool now checks whether changing just **one** subjective rating by **+1 or −1 point** could change the lead, without changing weights or any other ratings. This is a bounded what-if calculation, **not a probability or forecast**.
 
 
+## V4.0 · Fixed-total weight reallocation
+
+Step 8 now offers an optional **Keep the raw weight total fixed** mode. V3's independent raw-weight changes remain the default. In the new mode, uncertain weights can move **only by compensating each other**, while unselected weights stay unchanged and the overall raw-weight total equals the current baseline. Selecting just one uncertain weight therefore gives it no freedom to change.
+
+Real Chromium screenshot of four A ratings and four raw weights with ±2 intervals and a fixed raw weight total of 14:
+
+<img src="docs/screenshots/14-fixed-total-weights.png" width="520" alt="V4 fixed-total original weights and uncertain ratings, showing the exact score-difference bounds.">
+
+The engine enumerates feasible bounded-simplex vertices (at most 6×2⁵=192 candidates for six factors) to compute exact A−B extremes jointly with selected uncertain score intervals. The actual feasible boundary scenario can be applied with confirmation and undone. Changing modes does not persist or export any uncertainty settings. These remain deterministic assumptions, never probabilities. See [the mathematical derivation](docs/UNCERTAINTY_METHOD.md).
+
 ## V3.0 · Combined rating and weight uncertainty
 
 Step 8 now accepts **both uncertain scores and uncertain raw weights**. Select individual score cells (±0.5, ±1, ±2 points) and/or factor weights (a separate ±0.5, ±1, ±2 original weight units). Unselected inputs remain fixed. The engine computes **exact joint bounds** for A−B while *renormalizing the changed weights*. Inspect a feasible extreme scoring/weighting scenario, optionally apply it with confirmation, then Undo to restore the original values.

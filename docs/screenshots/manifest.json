@@ -443,6 +443,58 @@
       },
       "note": "真实 Chromium 截图，来自 V3.0 原代码的虚构职业选择示例；非 AI 概念图。",
       "ok": true
+    },
+    {
+      "file": "docs/screenshots/14-fixed-total-weights.png",
+      "name": "fixed-total-score-weight-box",
+      "viewport": "1440×960",
+      "dpr": 2,
+      "theme": "light",
+      "browser": "Chromium 151.0.7922.34",
+      "commit": "8bea38402faa1b2085d44d3bacc64dbeaf9ec6e6",
+      "example": "offer",
+      "inputs": {
+        "ratingSides": [
+          {
+            "factorId": "f1",
+            "side": "A"
+          },
+          {
+            "factorId": "f2",
+            "side": "A"
+          },
+          {
+            "factorId": "f3",
+            "side": "A"
+          },
+          {
+            "factorId": "f4",
+            "side": "A"
+          }
+        ],
+        "ratingRadius": 2,
+        "weightFactors": [
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "weightRadius": 2,
+        "mode": "fixed-total"
+      },
+      "selfCheck": {
+        "kind": "joint-fixed-total",
+        "selectedRatings": 4,
+        "selectedWeights": 4,
+        "originalRawWeightTotal": 14,
+        "feasibleWeightVertices": 6,
+        "status": "both-possible",
+        "minDeltaApprox": -27.14,
+        "maxDeltaApprox": 36.43,
+        "baselineDeltaApprox": 7.14
+      },
+      "note": "真实 Chromium 源码运行截图：总额固定的 V4 数学界面；虚构职业选择案例，非 AI 效果图。",
+      "ok": true
     }
   ]
 }
