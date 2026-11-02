@@ -108,6 +108,10 @@ the one that's more worth asking.
 
 Step 8 now offers an optional **Keep the raw weight total fixed** mode. V3's independent raw-weight changes remain the default. In the new mode, uncertain weights can move **only by compensating each other**, while unselected weights stay unchanged and the overall raw-weight total equals the current baseline. Selecting just one uncertain weight therefore gives it no freedom to change.
 
+Real Chromium screenshot of four A ratings and four raw weights with ±2 intervals and a fixed raw weight total of 14:
+
+<img src="docs/screenshots/14-fixed-total-weights.png" width="520" alt="V4 fixed-total original weights and uncertain ratings, showing the exact score-difference bounds.">
+
 The engine enumerates feasible bounded-simplex vertices (at most 6×2⁵=192 candidates for six factors) to compute exact A−B extremes jointly with selected uncertain score intervals. The actual feasible boundary scenario can be applied with confirmation and undone. Changing modes does not persist or export any uncertainty settings. These remain deterministic assumptions, never probabilities. See [the mathematical derivation](docs/UNCERTAINTY_METHOD.md).
 
 ## V3.0 · Combined rating and weight uncertainty
