@@ -12,6 +12,7 @@
  */
 import { scoreDecision, RATING_MIN, RATING_MAX, TIE_EPSILON } from '../core.mjs';
 import { analyzeSelectedUncertainty, UNCERTAINTY_RADII } from './uncertainty-workbench.mjs';
+import { enumerateFixedSumWeightVertices } from './fixed-sum-weights.mjs';
 
 export const WEIGHT_RADII = Object.freeze([0.5, 1, 2]);
 const MAX_WEIGHT = 1e6;
@@ -24,7 +25,10 @@ function classify(lo, hi) {
 }
 
 export function analyzeJointUncertainty(raw, ratingSelections = [], ratingRadius = 1,
-  weightSelections = [], weightRadius = 1) {
+  weightSelections = [], weightRadius = 1, mode = 'independent') {
+  if (mode !== 'independent' && mode !== 'fixed-total') {
+    throw new RangeError('Unknown joint weight constraint mode');
+  }
   if (!WEIGHT_RADII.includes(weightRadius)) {
     throw new RangeError('权重幅度必须选择 0.5、1 或 2');
   }
@@ -46,7 +50,7 @@ export function analyzeJointUncertainty(raw, ratingSelections = [], ratingRadius
   if (!weightCount) {
     // 兼容 V2：不勾权重时保持先前计算的精确边界与见证结果。
     return {
-      ...rating, weightCount, weightRadius, weightCornersEvaluated: 0,
+      ...rating, weightCount, weightRadius, weightCornersEvaluated: 0, mode,
       weightRanges: point.factors.map((f) => ({
         factorId: f.id, label: f.label, lo: f.weight, hi: f.weight,
       })),
@@ -69,12 +73,18 @@ export function analyzeJointUncertainty(raw, ratingSelections = [], ratingRadius
   // 直接枚举 k 个可变权重的 2^k 角点，k<=6。
   let minDelta = Infinity, maxDelta = -Infinity;
   let minWeights = null, maxWeights = null, weightCornersEvaluated = 0;
-  const count = 2 ** variable.length;
-  for (let mask = 0; mask < count; mask += 1) {
-    const weights = weightRanges.map((r) => r.lo);
-    for (let j = 0; j < variable.length; j += 1) {
-      if (mask & (1 << j)) weights[variable[j]] = weightRanges[variable[j]].hi;
-    }
+  // 旧 V3 独立盒：全角点。V4 固定总和：至多一项处于区间内部的多面体顶点。
+  // 二者均作完整确定性穷举，不用概率或抽样。
+  const candidates = mode === 'fixed-total'
+    ? enumerateFixedSumWeightVertices(weightRanges, point.totalWeight, variable)
+    : Array.from({ length: 2 ** variable.length }, (_, mask) => {
+      const weights = weightRanges.map((r) => r.lo);
+      for (let j = 0; j < variable.length; j += 1) {
+        if (mask & (1 << j)) weights[variable[j]] = weightRanges[variable[j]].hi;
+      }
+      return weights;
+    });
+  for (const weights of candidates) {
     const total = weights.reduce((sum, value) => sum + value, 0);
     if (total <= 0) continue; // 全零权重无法定义归一化分数
     weightCornersEvaluated++;
@@ -117,7 +127,7 @@ export function analyzeJointUncertainty(raw, ratingSelections = [], ratingRadius
 
   return {
     point, activeCount, radius: ratingRadius,
-    weightCount, weightRadius, weightCornersEvaluated, weightRanges,
+    weightCount, weightRadius, weightCornersEvaluated, weightRanges, mode,
     status: classify(normalizedMin, normalizedMax),
     interval: { minDelta: normalizedMin, maxDelta: normalizedMax },
     canChangeWinner: point.winner === 'A'
